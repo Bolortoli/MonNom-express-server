@@ -1,0 +1,24 @@
+{
+  "name": "monnom-express-server",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "nodemon — exec babel-node app.js"
+  },
+  "dependencies": {
+    "@babel/core": "^7.13.10",
+    "@babel/node": "^7.13.12",
+    "@babel/preset-env": "^7.13.12",
+    "axios": "^0.21.1",
+    "body-parser": "^1.18.3",
+    "cookie-parser": "~1.4.4",
+    "cors": "^2.8.5",
+    "debug": "~2.6.9",
+    "express": "^4.16.4",
+    "http-errors": "~1.6.3",
+    "morgan": "~1.9.1",
+    "nodemon": "^2.0.7",
+    "pug": "2.0.0-beta11"
+  },
+  "type": "module"
+}
