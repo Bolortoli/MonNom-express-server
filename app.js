@@ -62,28 +62,7 @@ app.use(bodyParser.raw({ type: "*/*" }));
 // module.exports = app;
 // import { login } from "./authentication";
 
-function login(req, res) {
-	let response = null;
-	// console.log(req);
-	axios
-		.post("http://127.0.0.1:1337/auth/local", {
-			identifier: "admin",
-			password: "adminadmin",
-		})
-		.then((res) => {
-			// response = res;
-			console.log(res.data);
-		})
-		.catch((err) => {
-			console.log(err);
-			// response = err;
-		});
-	// console.log(response);
-}
-
 app.post("/admin-login", async (req, res) => {
-	// let response = null;
-	// console.log(req.params);
 	await axios
 		.post("http://127.0.0.1:1337/auth/local", {
 			identifier: req.body.identifier,
@@ -93,17 +72,56 @@ app.post("/admin-login", async (req, res) => {
 			console.log("got fcken success");
 			console.log(response.data);
 			res.send(response.data);
-			// response = res;
 		})
 		.catch((err) => {
 			console.log(err);
 			res.send({ response: "error" });
-			// response = err;
 		});
-	// console.log("req.body");
 	console.log(req.body);
-	// login(req, res);
-	// res.send(req.body);
+});
+
+app.get("/all-admins-list", async (req, res) => {
+	console.log(req);
+	await axios({
+		url: "http://127.0.0.1:1337/users",
+		method: "GET",
+		headers: {
+			Authorization: req.headers.authorization,
+		},
+	})
+		.then((response) => {
+			console.log("got fcken success");
+			console.log(response.data);
+			res.send(response.data);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ response: "error" });
+		});
+});
+
+app.post("/update-employee", async (req, res) => {
+	// console.log(req);
+	let id = req.body.id;
+	let body = Object.assign(req.body);
+	delete body["id"];
+	await axios({
+		headers: {
+			Authorization: req.headers.authorization,
+		},
+		url: `http://127.0.0.1:1337/users/${id}`,
+		method: "PUT",
+		data: body,
+	})
+		.then((response) => {
+			console.log("got fcken success");
+			console.log(response.data);
+			res.send(response.data);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ response: "error" });
+		});
 });
 
 app.listen(port, () => {
