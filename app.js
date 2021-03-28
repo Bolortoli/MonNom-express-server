@@ -124,6 +124,38 @@ app.post("/update-employee", async (req, res) => {
 		});
 });
 
+app.get("/podcast-channels", async (req, res) => {
+	await axios({
+		// headers: {
+		// 	Authorization: req.headers.authorization,
+		// },
+		url: `http://127.0.0.1:1337/podcast-channels`,
+		method: "GET",
+	})
+		.then((response) => {
+			try {
+				let sendableData = response.data.map((data) => {
+					return {
+						id: data.id,
+						contentMakerData: data.contect_maker_id,
+						name: data.name,
+						pic_small_url: data.cover_pic.formats.small.url,
+						episode_count: data.podcast_eposides.length,
+						created_date: data.created_at,
+					};
+				});
+				res.send(sendableData);
+			} catch (error) {
+				res.send({ response: "error1" });
+			}
+			// res.send(response.data);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ response: "error" });
+		});
+});
+
 app.listen(port, () => {
 	console.log(`Example app listening at http://localhost:${port}`);
 });
