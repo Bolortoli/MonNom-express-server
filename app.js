@@ -95,9 +95,7 @@ app.get("/all-admins-list", async (req, res) => {
 			// let sendData = response.data;
 			let sendData = response.data.filter(
 				(data) =>
-					data.role_identifier.role_number == 1 ||
-					data.role_identifier.role_number == 2 ||
-					data.role_identifier.role_number == 3
+					data.user_role == 1 || data.user_role == 2 || data.user_role == 3
 			);
 			res.send(sendData);
 		})
@@ -159,6 +157,24 @@ app.get("/podcast-channels", async (req, res) => {
 				res.send({ response: "error1", error: error });
 			}
 			// res.send(response.data);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ response: "error" });
+		});
+});
+
+app.get("/all-app-users", async (req, res) => {
+	await axios({
+		url: "http://127.0.0.1:1337/users",
+		method: "GET",
+		headers: {
+			Authorization: req.headers.authorization,
+		},
+	})
+		.then((response) => {
+			let sendData = response.data.filter((data) => data.user_role == 4);
+			res.send(sendData);
 		})
 		.catch((err) => {
 			console.log(err);
