@@ -90,9 +90,16 @@ app.get("/all-admins-list", async (req, res) => {
 		},
 	})
 		.then((response) => {
-			console.log("got fcken success");
-			console.log(response.data);
-			res.send(response.data);
+			// console.log("got fcken success");
+			// console.log(response.data);
+			// let sendData = response.data;
+			let sendData = response.data.filter(
+				(data) =>
+					data.role_identifier.role_number == 1 ||
+					data.role_identifier.role_number == 2 ||
+					data.role_identifier.role_number == 3
+			);
+			res.send(sendData);
 		})
 		.catch((err) => {
 			console.log(err);
@@ -114,8 +121,8 @@ app.post("/update-employee", async (req, res) => {
 		data: body,
 	})
 		.then((response) => {
-			console.log("got fcken success");
-			console.log(response.data);
+			// console.log("got fcken success");
+			// console.log(response.data);
 			res.send(response.data);
 		})
 		.catch((err) => {
@@ -134,19 +141,22 @@ app.get("/podcast-channels", async (req, res) => {
 	})
 		.then((response) => {
 			try {
-				let sendableData = response.data.map((data) => {
-					return {
-						id: data.id,
-						contentMakerData: data.contect_maker_id,
-						name: data.name,
-						pic_small_url: data.cover_pic.formats.small.url,
-						episode_count: data.podcast_eposides.length,
-						created_date: data.created_at,
-					};
-				});
+				let sendableData = response.data
+					.map((data) => {
+						return {
+							id: data.id,
+							contentMakerData: data.contect_maker_id,
+							name: data.name,
+							pic_small_url: data.cover_pic.formats.small.url,
+							episode_count: data.podcast_eposides.length,
+							created_date: data.created_at,
+						};
+						// else return null;
+					})
+					.filter((data) => data);
 				res.send(sendableData);
 			} catch (error) {
-				res.send({ response: "error1" });
+				res.send({ response: "error1", error: error });
 			}
 			// res.send(response.data);
 		})
