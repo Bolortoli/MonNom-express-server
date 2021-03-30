@@ -182,6 +182,53 @@ app.get("/all-app-users", async (req, res) => {
 		});
 });
 
+app.get("/all-app-users", async (req, res) => {
+	await axios({
+		url: "http://127.0.0.1:1337/users",
+		method: "GET",
+		headers: {
+			Authorization: req.headers.authorization,
+		},
+	})
+		.then((response) => {
+			let sendData = response.data.filter((data) => data.user_role == 4);
+			res.send(sendData);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ response: "error" });
+		});
+});
+
+app.get("/all-books-list", async (req, res) => {
+	await axios({
+		url: "http://127.0.0.1:1337/books",
+		method: "GET",
+		headers: {
+			Authorization: req.headers.authorization,
+		},
+	})
+		.then((response) => {
+			let tempResponse = response.data.map((temp) => {
+				return {
+					id: temp.id,
+					picture: temp.picture.url,
+					author_name: temp.book_author.name,
+					created_at: temp.created_at,
+					name: temp.name,
+					has_audio: temp.has_audio,
+					has_pdf: temp.has_pdf,
+					has_sale: temp.has_sale,
+				};
+			});
+			res.send(tempResponse);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ response: "error" });
+		});
+});
+
 app.listen(port, () => {
 	console.log(`Example app listening at http://localhost:${port}`);
 });
