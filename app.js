@@ -18,6 +18,7 @@ const port = 3001;
 import axios from "axios";
 import bodyParser from "body-parser";
 import cors from "cors";
+import multer from "multer";
 
 // var app = express();
 
@@ -29,40 +30,121 @@ import cors from "cors";
 // app.use(express.json());
 // app.use(express.urlencoded({ extended: false }));
 app.use(cors());
+// app.use(bodyParser.json());
+// app.use(
+// 	bodyParser.urlencoded({
+// 		extended: true,
+// 		parameterLimit: 50000,
+// 	})
+// );
 app.use(bodyParser.json());
-app.use(
-	bodyParser.urlencoded({
-		extended: true,
+// app.use(
+// 	bodyParser.urlencoded({
+// 		extended: true,
+// 	})
+// );
+// app.use(bodyParser.raw({ type: "*/*" }));
+const fileStorageEngine = multer.diskStorage({
+	destination: (req, file, cb) => {
+		cb(null, "./uploads");
+	},
+	filename: (req, file, cb) => {
+		cb(null, `${Date.now()}-${file.originalname}`);
+	},
+});
+
+const upload = multer({ storage: fileStorageEngine });
+
+app.get("/podcast-channels/:id", async (req, res, next) => {
+	await axios({
+		url: `http://127.0.0.1:1337/podcast-channels/${req.params.id}`,
+		method: "GET",
+		// headers: {
+		// 	Authorization: req.headers.authorization,
+		// },
 	})
+		.then((response) => {
+			// console.log("got fcken success");
+			// console.log(response.data);
+			let sendData = {
+				id: response.data.id,
+				user_firstname: response.data.content_maker_id.firstname,
+				user_lastname: response.data.content_maker_id.lastname,
+				channel_name: response.data.name,
+				channel_created_at: response.data.created_at,
+				channel_updated_at: response.data.updated_at,
+				channel_description: response.data.description,
+				channel_cover_pic:
+					response.data.cover_pic != null
+						? response.data.cover_pic.formats.small.url
+						: null,
+				user_podcasts: response.data.podcast_eposides.map((d) => {
+					return {
+						id: d.id,
+						podcast_file_name: d.name,
+						podcast_desc: d.description,
+						episode_number: d.episode_number,
+						podcast_added_date: d.create_at,
+						listen_count: d.view_count,
+					};
+				}),
+			};
+			// let sendData = response.data.filter(
+			// 	(data) =>
+			// 		data.user_role == 1 || data.user_role == 2 || data.user_role == 3
+			// );
+			res.send(sendData);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ response: "error" });
+		});
+	// res.send(req.params.id);
+});
+
+app.post(
+	"/create-admin",
+	upload.single("profile_picture"),
+	async (req, res, next) => {
+		console.log(req.body);
+		try {
+			// console.log("------------AUTHORIZATION HEADER ------------");
+			// console.log(req.headers.authorization);
+			await axios({
+				url: "http://127.0.0.1:1337/users",
+				method: "POST",
+				headers: {
+					Authorization: req.headers.authorization,
+				},
+				body: {
+					username: req.body.username,
+					password: req.body.password,
+					role: 1,
+					phone: req.body.phone,
+					gender: req.body.gender,
+					fullname: req.body.fullname,
+					user_role: req.body.user_role,
+					email: "bo@csg.dme",
+				},
+			})
+				.then((response) => {
+					// console.log(response.data);
+					res.send(response.data);
+				})
+				.catch((err) => {
+					// console.log("%cerror", "font-size: 15px;");
+					console.log(err.response.data);
+					res.send(err.response.data);
+					// throw new Error("BROKEN");
+				});
+		} catch (err) {
+			next(err);
+		}
+	}
 );
-app.use(bodyParser.raw({ type: "*/*" }));
-// app.use(bodyParser.raw());
-// app.use(cookieParser());
-// app.use(express.static(path.join(__dirname, "public")));
-
-// app.use("/", indexRouter);
-// app.use("/users", usersRouter);
-
-// // catch 404 and forward to error handler
-// app.use(function (req, res, next) {
-// 	next(createError(404));
-// });
-
-// // error handler
-// app.use(function (err, req, res, next) {
-// 	// set locals, only providing error in development
-// 	res.locals.message = err.message;
-// 	res.locals.error = req.app.get("env") === "development" ? err : {};
-
-// 	// render the error page
-// 	res.status(err.status || 500);
-// 	res.render("error");
-// });
-
-// module.exports = app;
-// import { login } from "./authentication";
 
 app.post("/admin-login", async (req, res) => {
+	console.log(req.body);
 	await axios
 		.post("http://127.0.0.1:1337/auth/local", {
 			identifier: req.body.identifier,
@@ -74,14 +156,14 @@ app.post("/admin-login", async (req, res) => {
 			res.send(response.data);
 		})
 		.catch((err) => {
-			console.log(err);
+			// console.log(err);
 			res.send({ response: "error" });
 		});
 	console.log(req.body);
 });
 
 app.get("/all-admins-list", async (req, res) => {
-	console.log(req);
+	// console.log(req);
 	await axios({
 		url: "http://127.0.0.1:1337/users",
 		method: "GET",
@@ -138,24 +220,27 @@ app.get("/podcast-channels", async (req, res) => {
 		method: "GET",
 	})
 		.then((response) => {
-			try {
-				let sendableData = response.data
+			let sendableData = {
+				podcastChannels: response.data
 					.map((data) => {
+						console.log(data);
 						return {
 							id: data.id,
-							contentMakerData: data.contect_maker_id,
-							name: data.name,
-							pic_small_url: data.cover_pic.formats.small.url,
+							podcast_author: {
+								id: data.content_maker_id.id,
+								firstname: data.content_maker_id.firstname,
+								lastname: data.content_maker_id.lastname,
+							},
+							podcast_name: data.name,
+							podcast_pic_url: data.cover_pic.formats.small.url,
 							episode_count: data.podcast_eposides.length,
-							created_date: data.created_at,
+							podcast_added_date: data.created_at,
 						};
 						// else return null;
 					})
-					.filter((data) => data);
-				res.send(sendableData);
-			} catch (error) {
-				res.send({ response: "error1", error: error });
-			}
+					.filter((data) => data),
+			};
+			res.send(sendableData);
 			// res.send(response.data);
 		})
 		.catch((err) => {
@@ -182,23 +267,23 @@ app.get("/all-app-users", async (req, res) => {
 		});
 });
 
-app.get("/all-app-users", async (req, res) => {
-	await axios({
-		url: "http://127.0.0.1:1337/users",
-		method: "GET",
-		headers: {
-			Authorization: req.headers.authorization,
-		},
-	})
-		.then((response) => {
-			let sendData = response.data.filter((data) => data.user_role == 4);
-			res.send(sendData);
-		})
-		.catch((err) => {
-			console.log(err);
-			res.send({ response: "error" });
-		});
-});
+// app.get("/all-app-users", async (req, res) => {
+// 	await axios({
+// 		url: "http://127.0.0.1:1337/users",
+// 		method: "GET",
+// 		headers: {
+// 			Authorization: req.headers.authorization,
+// 		},
+// 	})
+// 		.then((response) => {
+// 			let sendData = response.data.filter((data) => data.user_role == 4);
+// 			res.send(sendData);
+// 		})
+// 		.catch((err) => {
+// 			console.log(err);
+// 			res.send({ response: "error" });
+// 		});
+// });
 
 app.get("/all-books-list", async (req, res) => {
 	await axios({
