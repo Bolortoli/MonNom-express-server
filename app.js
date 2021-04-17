@@ -81,7 +81,9 @@ app.get("/podcast-channels/:id", async (req, res, next) => {
 				user_podcasts: response.data.podcast_eposides.map((d) => {
 					return {
 						id: d.id,
-						podcast_file_name: d.name,
+						podcast_name: d.name,
+						podcast_file_name: d.audio_file_path[0].name,
+						podcast_file_size: d.audio_file_path[0].size,
 						podcast_desc: d.description,
 						episode_number: d.episode_number,
 						podcast_added_date: d.create_at,
@@ -296,12 +298,13 @@ app.get("/all-books-list", async (req, res) => {
 		.then((response) => {
 			let tempResponse = response.data.map((temp) => {
 				return {
+					users_permissions_user: temp.users_permissions_user.id,
 					id: temp.id,
-					picture: temp.picture.url,
-					author_name: temp.book_author.name,
-					created_at: temp.created_at,
-					name: temp.name,
-					has_audio: temp.has_audio,
+					book_pic_url: temp.picture.url,
+					book_author_name: temp.book_author.name,
+					book_added_date: temp.created_at,
+					book_name: temp.name,
+					has_mp3: temp.has_audio,
 					has_pdf: temp.has_pdf,
 					has_sale: temp.has_sale,
 				};
