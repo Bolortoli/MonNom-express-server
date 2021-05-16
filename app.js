@@ -7,11 +7,15 @@ import { fileURLToPath } from "url";
 import path, { dirname } from "path";
 import http from "http";
 import fs from "fs";
+import client from "twilio";
 
 const app = express();
 const port = 3001;
 const STRAPI_URL = "http://127.0.0.1:1337";
 const STRAPI_URL_IP = "http://192.168.0.172:1337";
+const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
+const authToken = "e7b32db7e802e78dadc563311804baf6";
+const Client = client(accountSid, authToken);
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -961,6 +965,15 @@ app.post("/create-confirmation-code", async (req, res) => {
 						},
 					})
 						.then((response) => {
+
+							//anhaa
+							Client.messages
+							.create({
+							   body: 'Monnom App баталгаажуулах код: <#>'+confirmationCode,
+							   from: '+15614139965',
+							   to: '+976'+req.body.phone
+							 })
+							.then(message => console.log(message.sid));
 							send200({ confirmationCode, phone: req.body.phone }, res);
 						})
 						.catch((err) => {
