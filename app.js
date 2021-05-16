@@ -964,16 +964,16 @@ app.post("/create-confirmation-code", async (req, res) => {
 							Authorization: `Bearer ${response.data.jwt}`,
 						},
 					})
-						.then((response) => {
-
+						.then(async (response) => {
 							//anhaa
-							Client.messages
-							.create({
-							   body: 'Monnom App баталгаажуулах код: <#>'+confirmationCode,
-							   from: '+15614139965',
-							   to: '+976'+req.body.phone
-							 })
-							.then(message => console.log(message.sid));
+							await Client.messages
+								.create({
+									body: "Monnom App баталгаажуулах код: <#>" + confirmationCode,
+									from: "+15614139965",
+									to: "+97680085517",
+								})
+								.then((message) => console.log(message.sid))
+								.catch((e) => console.log(e));
 							send200({ confirmationCode, phone: req.body.phone }, res);
 						})
 						.catch((err) => {
