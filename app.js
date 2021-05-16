@@ -833,6 +833,97 @@ app.get("/all-books-list", async (req, res) => {
 
 // ----------------------------- APP APIs -----------------------------
 
+// all channels list
+app.get("/app/live", async (req, res, next) => {
+	try {
+		let responseData = {
+			channelsList: [],
+		};
+
+		let channel = await axios({
+			url: `${STRAPI_URL}/radio-channels`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error saved books";
+		});
+
+		channel = channel.data;
+
+		responseData.channelsList = channel.map((c) => {
+			return {
+				id: c.id,
+				name: c.name,
+			};
+		});
+
+		send200(responseData, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+// Statistics about dashboard
+app.get("/app/live/:channel_id", async (req, res, next) => {
+	try {
+		let responseData = {
+			mp3_file_path: null,
+			current_second: null,
+			audio_duration: null,
+		};
+
+		let channel = await axios({
+			url: `${STRAPI_URL}/radio-channels/${req.params.channel_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error saved books";
+		});
+
+		channel = channel.data;
+		let channel_audio = channel.radio_channel_audios;
+
+		channel_audio.sort(function (a, b) {
+			return b.stack_number - a.stack_number;
+		});
+
+		// ------------ GET TOTAL RADIO AUDIOS SECONDS ------------
+		let totalDuration = 0;
+		channel_audio.forEach((audio) => {
+			totalDuration += parseInt(audio.audio_duration);
+		});
+
+		// ------------ GET DIFFERENCE OF TODAY AND LAST UPDATED SECONDS in ms ------------
+		let differce = parseInt((new Date().getTime() - new Date(channel.updated_at).getTime()) / 1000);
+
+		// ------------ CONVERT SECONDS TO TOTAL DURATION MODULO ------------
+		differce %= totalDuration;
+
+		// ------------ FIND CURRENT MP3 FILE PATH ------------
+		try {
+			channel_audio.forEach((audio) => {
+				if (differce < parseInt(audio.audio_duration)) {
+					responseData.current_second = parseInt(audio.audio_duration) - (parseInt(audio.audio_duration) - differce);
+					responseData.mp3_file_path = `${STRAPI_URL_IP}${audio.audio?.url}`;
+					responseData.audio_duration = parseInt(audio.audio_duration);
+				} else {
+					differce -= parseInt(audio.audio_duration);
+				}
+			});
+		} catch (error) {
+			console.log("loop STOPPED");
+		}
+
+		send200(responseData, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
 app.post("/create-confirmation-code", async (req, res) => {
 	let confirmationCode = "xxxxxx".replace(/[xy]/g, function (c) {
 		var r = (Math.random() * 16) | 0,
@@ -967,7 +1058,7 @@ app.post("/app/create-user", async (req, res) => {
 		});
 });
 
-app.get("/app/books/main", async (req, res) => {
+app.get("/app/books/main/:user_id", async (req, res) => {
 	console.log("book app");
 	try {
 		let responseData = {
@@ -998,6 +1089,16 @@ app.get("/app/books/main", async (req, res) => {
 			throw err;
 		});
 
+		let user_saved_books = await axios({
+			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.params.user_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw err;
+		});
+
 		let special_book = await axios({
 			url: `${STRAPI_URL}/special-book`,
 			method: "GET",
@@ -1011,6 +1112,7 @@ app.get("/app/books/main", async (req, res) => {
 		books = books.data;
 		book_categories = book_categories.data;
 		special_book = special_book.data;
+		user_saved_books = user_saved_books.data;
 
 		books.forEach((book) => {
 			if (book.is_featured) {
@@ -1026,11 +1128,14 @@ app.get("/app/books/main", async (req, res) => {
 					else tempAuthorsString += `${author.author_name}  `;
 				});
 
+				let is_saved = user_saved_books.find((save) => save.book.id == book.id);
+
 				responseData.audioBooks.push({
 					id: book.id,
 					picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
 					authors: tempAuthorsString,
 					name: book.name,
+					is_saved: is_saved != undefined ? true : false,
 				});
 			}
 		});
@@ -1046,12 +1151,14 @@ app.get("/app/books/main", async (req, res) => {
 						if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
 						else tempAuthorsString += `${author.author_name}  `;
 					});
+					let is_saved = user_saved_books.find((save) => save.book.id == book.id);
 
 					return {
 						id: book.id,
 						picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
 						authors: tempAuthorsString,
 						name: book.name,
+						is_saved: is_saved != undefined ? true : false,
 					};
 				});
 
@@ -1162,10 +1269,12 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 					return c.length != 0;
 				})
 				.map((channel) => {
+					let is_saved = saved_podcasts.find((save) => save.podcast_channel?.id == channel.id);
 					return {
 						id: channel.id,
 						name: channel.name,
 						picture_path: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
+						is_saved: is_saved != undefined,
 					};
 				});
 
