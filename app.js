@@ -1,90 +1,423 @@
-// import axios from "axios";
-// import createError from "http-errors";
-// // var createError = require("http-errors");
-// import express from "express";
-// import {} from "module";
-// // var express = require("express");
-// // var path = require("path");
-// // var cookieParser = require("cookie-parser");
-// // var logger = require("morgan");
-
-// // var indexRouter = require("./routes/index");
-// // var usersRouter = require("./routes/users");
-
-import indexRouter from "./routes/index.js";
-import express from "express";
-const app = express();
-const port = 3001;
+import express, { response } from "express";
 import axios from "axios";
 import bodyParser from "body-parser";
 import cors from "cors";
 import multer from "multer";
+import { fileURLToPath } from "url";
+import path, { dirname } from "path";
+import http from "http";
+import fs from "fs";
 
-// var app = express();
+const app = express();
+const port = 3001;
+const STRAPI_URL = "http://127.0.0.1:1337";
+const STRAPI_URL_IP = "http://192.168.0.172:1337";
 
-// // view engine setup
-// app.set("views", path.join(__dirname, "views"));
-// app.set("view engine", "pug");
-
-// app.use(logger("dev"));
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: false }));
 app.use(cors());
-// app.use(bodyParser.json());
-// app.use(
-// 	bodyParser.urlencoded({
-// 		extended: true,
-// 		parameterLimit: 50000,
-// 	})
-// );
 app.use(bodyParser.json());
-// app.use(
-// 	bodyParser.urlencoded({
-// 		extended: true,
-// 	})
-// );
-// app.use(bodyParser.raw({ type: "*/*" }));
+
 const fileStorageEngine = multer.diskStorage({
 	destination: (req, file, cb) => {
 		cb(null, "./uploads");
 	},
 	filename: (req, file, cb) => {
-		cb(null, `${Date.now()}-${file.originalname}`);
+		cb(null, `${file.originalname}`);
 	},
 });
 
 const upload = multer({ storage: fileStorageEngine });
 
-app.get("/podcast-channels/:id", async (req, res, next) => {
+// ----------------------------- WEBSITE APIs -----------------------------
+
+// Statistics about dashboard
+app.get("/dashboard/", async (req, res, next) => {
+	try {
+		let responseData = {
+			totalPodcastChannels: 0,
+			totalPodcastFollows: 0,
+			totalRadioChannels: 0,
+			totalAudioBooks: 0,
+			totalEBooks: 0,
+			totalBooks: 0,
+			usersByGender: {
+				maleCount: 0,
+				femaleCount: 0,
+				othersCount: 0,
+			},
+			usersByAge: {
+				category18: 0,
+				category18_28: 0,
+				category28_38: 0,
+				category38_48: 0,
+				category48_58: 0,
+				category58: 0,
+			},
+			mostFollowedPodcastChannels: [],
+			mostBoughtBooks: [],
+			mostBoughtAudioBooks: [],
+			mostBoughtPDFBooks: [],
+		};
+
+		let customer_saved_books = await axios({
+			url: `${STRAPI_URL}/customer-paid-books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error saved books";
+		});
+
+		let customer_saved_ebooks = await axios({
+			url: `${STRAPI_URL}/customer-paid-ebooks`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error saved ebooks";
+		});
+
+		let podcast_channels = await axios({
+			url: `${STRAPI_URL}/podcast-channels`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error podcast channels";
+		});
+
+		let podcast_channels_saves = await axios({
+			url: `${STRAPI_URL}/user-saved-podcasts`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error saved podcasts";
+		});
+
+		let totalRadioChannels = await axios({
+			url: `${STRAPI_URL}/radio-channels/count`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error radio";
+		});
+
+		let books = await axios({
+			url: `${STRAPI_URL}/books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error books";
+		});
+
+		let app_users = await axios({
+			url: `${STRAPI_URL}/users?user_role=6`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error users";
+		});
+
+		app_users = app_users.data;
+		podcast_channels = podcast_channels.data;
+		podcast_channels_saves = podcast_channels_saves.data;
+		books = books.data;
+		customer_saved_books = customer_saved_books.data;
+		customer_saved_ebooks = customer_saved_ebooks.data;
+
+		// ------------ MOST BOUGHT ONLINE BOOKS ------------
+		let tempBooks = [];
+		customer_saved_books.forEach((buy) => {
+			let tempBook_loop = tempBooks.find((book) => book.id == buy.book?.id);
+			if (tempBook_loop != undefined && tempBooks.length != 0) tempBook_loop.bought_count += 1;
+			else
+				tempBooks.push({
+					id: buy.book?.id,
+					name: buy.book?.name,
+					is_featured: buy.book?.is_featured ? "Тийм" : "Үгүй",
+					bought_count: 1,
+				});
+		});
+
+		tempBooks.sort(function (a, b) {
+			return b.bought_count - a.bought_count;
+		});
+		// ------------ MOST BOUGHT ONLINE BOOKS ------------
+
+		// ------------ MOST BOUGHT ONLINE BOOKS ------------
+		let tempAudioBooks = [];
+		let tempPDFBooks = [];
+		customer_saved_ebooks.forEach((buy) => {
+			let tempAudioBook_loop = tempAudioBooks.find((book) => book.id == buy.book?.id);
+			let tempPDFBook_loop = tempPDFBooks.find((book) => book.id == buy.book?.id);
+			// AUDIO COUNTS
+			if (buy.book.has_audio) {
+				if (tempAudioBook_loop != undefined && tempAudioBooks.length != 0) tempAudioBook_loop.bought_count += 1;
+				else
+					tempAudioBooks.push({
+						id: buy.book?.id,
+						name: buy.book?.name,
+						is_featured: buy.book?.is_featured ? "Тийм" : "Үгүй",
+						bought_count: 1,
+					});
+			}
+			// PDF COUNTS
+			if (buy.book.has_pdf) {
+				if (tempPDFBook_loop != undefined && tempPDFBooks.length != 0) tempPDFBook_loop.bought_count += 1;
+				else
+					tempPDFBooks.push({
+						id: buy.book?.id,
+						name: buy.book?.name,
+						is_featured: buy.book?.is_featured ? "Тийм" : "Үгүй",
+						bought_count: 1,
+					});
+			}
+		});
+
+		tempAudioBooks.sort(function (a, b) {
+			return b.bought_count - a.bought_count;
+		});
+
+		tempPDFBooks.sort(function (a, b) {
+			return b.bought_count - a.bought_count;
+		});
+		// ------------ MOST BOUGHT ONLINE BOOKS ------------
+
+		// ------------ APP USERS BY GENDER AND AGE ------------
+		app_users.forEach((user) => {
+			if (user.gender == "Male") responseData.usersByGender.maleCount += 1;
+			if (user.gender == "Female") responseData.usersByGender.femaleCount += 1;
+			if (user.gender == "Others") responseData.usersByGender.othersCount += 1;
+
+			if (user.birthday != null) {
+				let user_age = getAge(user.birthday);
+				if (user_age < 18) responseData.usersByAge.category18 += 1;
+				if (user_age < 28 && user_age >= 18) responseData.usersByAge.category18_28 += 1;
+				if (user_age < 38 && user_age >= 28) responseData.usersByAge.category28_38 += 1;
+				if (user_age < 48 && user_age >= 38) responseData.usersByAge.category38_48 += 1;
+				if (user_age < 58 && user_age >= 48) responseData.usersByAge.category48_58 += 1;
+				if (user_age > 58) responseData.usersByAge.category58 += 1;
+			}
+		});
+		// ------------ APP USERS BY GENDER AND AGE ------------
+
+		// ------------ MOST SAVED PODCAST CHANNELS ------------
+		let tempPodcastChannelsSaves = [];
+		podcast_channels_saves.forEach((save) => {
+			let tempPodcastChannel = tempPodcastChannelsSaves.find((channel) => channel.id == save.podcast_channel?.id);
+			if (tempPodcastChannel != undefined && tempPodcastChannelsSaves.length != 0) tempPodcastChannel.saves_count += 1;
+			else
+				tempPodcastChannelsSaves.push({
+					id: save.podcast_channel?.id,
+					name: save.podcast_channel?.name,
+					is_featured: save.podcast_channel?.is_featured ? "Тийм" : "Үгүй",
+					saves_count: 1,
+				});
+		});
+
+		tempPodcastChannelsSaves.sort(function (a, b) {
+			return b.saves_count - a.saves_count;
+		});
+		// ------------ MOST SAVED PODCAST CHANNELS ------------
+
+		// ------------ BOOKS COUNTER ------------
+		books.forEach((book) => {
+			if (book.has_audio) responseData.totalAudioBooks += 1;
+			if (book.has_pdf) responseData.totalEBooks += 1;
+			if (book.has_sale) responseData.totalBooks += 1;
+		});
+		// ------------ BOOKS COUNTER ------------
+
+		responseData.totalPodcastChannels = podcast_channels.length;
+		responseData.totalPodcastFollows = podcast_channels_saves.length;
+		responseData.totalRadioChannels = totalRadioChannels.data;
+		responseData.mostFollowedPodcastChannels = tempPodcastChannelsSaves;
+		responseData.mostBoughtAudioBooks = tempAudioBooks;
+		responseData.mostBoughtPDFBooks = tempPDFBooks;
+		responseData.mostBoughtBooks = tempBooks;
+
+		send200(responseData, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+// Information about specific book author all books
+app.get("/book-single-by-author/:id", async (req, res, next) => {
+	console.log("book single");
 	await axios({
-		url: `http://127.0.0.1:1337/podcast-channels/${req.params.id}`,
+		url: `${STRAPI_URL}/users/${req.params.id}`,
 		method: "GET",
 		// headers: {
 		// 	Authorization: req.headers.authorization,
 		// },
 	})
+		.then(async (response) => {
+			// TODO user data
+			let sendData = {
+				user: {
+					id: response.data.id,
+					user_fullname: response.data.fullname,
+					user_pic_url: response.data.profile_picture ? response.data.profile_picture.url : null,
+					user_mail: response.data.email,
+					user_joined_date: response.data.created_at,
+					user_phone: response.data.phone,
+				},
+				user_books: null,
+				available_authors: null,
+				available_categories: null,
+			};
+			await axios({
+				method: "GET",
+				url: `${STRAPI_URL}/books?users_permissions_user.id=${req.params.id}`,
+				// headers: {
+				// 	Authorization: req.headers.authorization,
+				// },
+			})
+				.then(async (response) => {
+					// console.log(response.data);
+					sendData.user_books = response.data.map((book) => {
+						return {
+							id: book.id,
+							book_pic_url: book.picture?.url,
+							book_name: book.name,
+							book_author: book.book_authors.map((author) => {
+								return {
+									id: author.id,
+									name: author.author_name,
+								};
+							}),
+							book_category: book.book_categories.map((category) => {
+								return {
+									id: category.id,
+									name: category.name,
+								};
+							}),
+							book_added_date: book.created_at,
+							has_sale: book.has_sale,
+							has_mp3: book.has_audio,
+							has_pdf: book.has_pdf,
+							book_desc: book.introduction,
+							book_comments: book.book_comments,
+							is_featured: book.is_featured,
+							online_book_price: book.online_book_price,
+							book_price: book.book_price,
+							sale_quantity: book.sale_quantity,
+							book_sales_count: 0,
+							online_book_sales_count: 0,
+						};
+					});
+					await axios({
+						method: "GET",
+						url: `${STRAPI_URL}/book-authors`,
+						// headers: {
+						// 	Authorization: req.headers.authorization,
+						// },
+					})
+						.then(async (responseAuthors) => {
+							sendData.available_authors = responseAuthors.data;
+							await axios({
+								method: "GET",
+								url: `${STRAPI_URL}/book-categories`,
+								// headers: {
+								// 	Authorization: req.headers.authorization,
+								// },
+							})
+								.then(async (responseCategories) => {
+									sendData.available_categories = responseCategories.data;
+									await axios({
+										method: "GET",
+										url: `${STRAPI_URL}/customer-paid-books`,
+										// headers: {
+										// 	Authorization: req.headers.authorization,
+										// },
+									})
+										.then((responsePayments) => {
+											sendData.user_books.forEach((book) => (book.book_sales_count = responsePayments.data.filter((payment) => book.id == payment.book.id).length));
+										})
+										.catch((err) => {
+											// send400("error", res);
+											throw "broken";
+										});
+									await axios({
+										method: "GET",
+										url: `${STRAPI_URL}/customer-paid-ebooks`,
+										// headers: {
+										// 	Authorization: req.headers.authorization,
+										// },
+									})
+										.then((responsePayments) => {
+											sendData.user_books.forEach((book) => (book.online_book_sales_count = responsePayments.data.filter((payment) => book.id == payment.book.id).length));
+										})
+										.catch((err) => {
+											// send400("error", res);
+											throw "broken";
+										});
+								})
+								.catch((err) => {
+									throw "broken";
+									// send400("error", res);
+								});
+						})
+						.catch((err) => {
+							throw "broken";
+							// send400("error", res);
+						});
+
+					// TODO book data
+					res.send(sendData);
+				})
+				.catch((err) => {
+					throw "broken";
+					// console.log(err);
+					// send400("error", res);
+				});
+		})
+		.catch((err) => {
+			// console.log(err);
+			send400("error", res);
+		});
+
+	// res.send(test);
+});
+
+// Information about specific podcast channel
+app.get("/podcast-channels/:id", async (req, res, next) => {
+	await axios({
+		url: `${STRAPI_URL}/podcast-channels/${req.params.id}`,
+		method: "GET",
+		headers: {
+			Authorization: req.headers.authorization,
+		},
+	})
 		.then((response) => {
-			// console.log("got fcken success");
-			// console.log(response.data);
+			console.log("got fcken success");
+			console.log(response.data);
 			let sendData = {
 				id: response.data.id,
-				user_firstname: response.data.content_maker_id.firstname,
-				user_lastname: response.data.content_maker_id.lastname,
+				user_fullname: response.data.users_permissions_user?.fullname,
 				channel_name: response.data.name,
 				channel_created_at: response.data.created_at,
 				channel_updated_at: response.data.updated_at,
 				channel_description: response.data.description,
-				channel_cover_pic:
-					response.data.cover_pic != null
-						? response.data.cover_pic.formats.small.url
-						: null,
-				user_podcasts: response.data.podcast_eposides.map((d) => {
+				channel_cover_pic: response.data.cover_pic != null ? response.data.cover_pic.url : null,
+				user_podcasts: response.data.podcast_episodes.map((d) => {
 					return {
 						id: d.id,
-						podcast_name: d.name,
-						podcast_file_name: d.audio_file_path[0].name,
-						podcast_file_size: d.audio_file_path[0].size,
-						podcast_desc: d.description,
+						podcast_name: d.episode_name,
+						podcast_file_name: d.audio_file_path ? d.audio_file_path.name : null,
+						podcast_file_size: d.audio_file_path ? d.audio_file_path.size : null,
+						podcast_desc: d.episode_description,
 						episode_number: d.episode_number,
 						podcast_added_date: d.create_at,
 						listen_count: d.view_count,
@@ -99,96 +432,274 @@ app.get("/podcast-channels/:id", async (req, res, next) => {
 		})
 		.catch((err) => {
 			console.log(err);
-			res.send({ response: "error" });
+			res.status(400).send({ response: "error" });
 		});
 	// res.send(req.params.id);
 });
 
-app.post(
-	"/create-admin",
-	upload.single("profile_picture"),
-	async (req, res, next) => {
-		console.log(req.body);
-		try {
-			// console.log("------------AUTHORIZATION HEADER ------------");
-			// console.log(req.headers.authorization);
-			await axios({
-				url: "http://127.0.0.1:1337/users",
-				method: "POST",
-				headers: {
-					Authorization: req.headers.authorization,
-				},
-				body: {
-					username: req.body.username,
-					password: req.body.password,
-					role: 1,
-					phone: req.body.phone,
-					gender: req.body.gender,
-					fullname: req.body.fullname,
-					user_role: req.body.user_role,
-					email: "bo@csg.dme",
-				},
-			})
-				.then((response) => {
-					// console.log(response.data);
-					res.send(response.data);
+// Delete podcast episode
+app.delete("/podcast/:id", async (req, res, next) => {
+	console.log("delete");
+	axios
+		.delete(`${STRAPI_URL}/podcast-episodes/${req.params.id}`)
+		.then((response) => {
+			console.log(response.data);
+			res.status(202).send({ message: "success" });
+		})
+		.catch((err) => {
+			console.log(err);
+			res.status(400).send({ message: "error" });
+		});
+	// console.log(JSON.parse(req.body.data));
+	console.log(req.body);
+	// res.send(req.body);
+});
+
+// Create podcast episode
+app.post("/podcast", upload.single("podcast_episode"), async (req, res, next) => {
+	// console.log("asdasd");
+	// res.send(req.body);
+	await axios
+		.post(`${STRAPI_URL}/podcast-episodes`, formData, config)
+		.then(async (res) => {
+			console.log("res.data");
+			console.log(res.data);
+			let tempResponse = res.data;
+			let imageData = new FormData();
+
+			imageData.append(`files`, profile_picture_create);
+
+			imageData.append("refId", res.data.id);
+			imageData.append("ref", "user");
+			imageData.append("field", "profile_picture");
+			imageData.append("source", "users-permissions");
+
+			await axios
+				.post("${STRAPI_URL}/upload", imageData, config)
+				.then((res) => {
+					tempResponse.profile_picture = res.data[0];
+					SetIsNetworkLoading(false);
 				})
 				.catch((err) => {
-					// console.log("%cerror", "font-size: 15px;");
-					console.log(err.response.data);
-					res.send(err.response.data);
-					// throw new Error("BROKEN");
+					SetIsNetworkError(true);
 				});
-		} catch (err) {
-			next(err);
-		}
-	}
-);
+			console.log(tempResponse);
+			initializeUsersList([tempResponse]);
+		})
+		.catch((err) => {
+			SetIsNetworkError(true);
+		});
+});
 
+// Create admin
+app.post("/create-admin", upload.single("profile_picture"), async (req, res, next) => {
+	console.log("body");
+	console.log(req.body);
+	try {
+		// console.log("------------AUTHORIZATION HEADER ------------");
+		// console.log(req.headers.authorization);
+		await axios({
+			url: `${STRAPI_URL}/users`,
+			method: "POST",
+			headers: {
+				"content-type": "multipart/form-data",
+				Authorization: req.headers.authorization,
+			},
+			body: {
+				username: req.body.username,
+				password: req.body.password,
+				role: 1,
+				phone: req.body.phone,
+				gender: req.body.gender,
+				fullname: req.body.fullname,
+				user_role: req.body.user_role,
+				e_mail: req.body.emailof,
+				email: req.body.emailof,
+			},
+		})
+			.then((response) => {
+				console.log("response.data");
+				send200(response.data, res);
+				// res.send(response.data);
+			})
+			.catch((err) => {
+				// console.log("%cerror", "font-size: 15px;");
+				console.log(err.response.data);
+				send400(err.response.data, res);
+				// res.send();
+				// throw new Error("BROKEN");
+			});
+	} catch (err) {
+		next(err);
+	}
+});
+
+// Update terms and conditions
+app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, res) => {
+	console.log("body");
+	console.log(req.body.terms);
+	await axios({
+		url: `${STRAPI_URL}/settings`,
+		method: "PUT",
+		headers: {
+			// "Content-Type": "multipart/form-data",
+			// "Content-Type": "application/x-www-form-urlencoded",
+			// Authorization: req.headers.authorization,
+		},
+		data: {
+			TermsAndConditions: req.body.terms,
+		},
+	})
+		.then((response) => {
+			send200(response.data, res);
+			// res.send(response.data);
+		})
+		.catch((err) => {
+			console.log(err);
+			send400("error", res);
+		});
+	// res.send(req.body);
+});
+
+// Login
 app.post("/admin-login", async (req, res) => {
 	console.log(req.body);
 	await axios
-		.post("http://127.0.0.1:1337/auth/local", {
+		.post(`${STRAPI_URL}/auth/local`, {
 			identifier: req.body.identifier,
 			password: req.body.password,
 		})
 		.then((response) => {
-			console.log("got fcken success");
-			console.log(response.data);
-			res.send(response.data);
+			send200(response.data, res);
+			// res.send(response.data);
 		})
 		.catch((err) => {
 			// console.log(err);
-			res.send({ response: "error" });
+			send400("error", res);
 		});
 	console.log(req.body);
 });
 
+app.get("/settings-page", async (req, res) => {
+	try {
+		let settings = await axios({
+			url: `${STRAPI_URL}/settings`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error";
+		});
+
+		let podcast_categories = await axios({
+			url: `${STRAPI_URL}/podcast-categories`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		let book_categories = await axios({
+			url: `${STRAPI_URL}/book-categories`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error2";
+		});
+
+		let book_authors = await axios({
+			url: `${STRAPI_URL}/book-authors`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error3";
+		});
+
+		settings = settings.data;
+		podcast_categories = podcast_categories.data;
+		book_categories = book_categories.data;
+		book_authors = book_authors.data;
+
+		let data = {
+			termsAndConditions: settings.TermsAndConditions,
+			podcast_categories: podcast_categories.map((category) => {
+				return {
+					value: category.id,
+					label: category.name,
+				};
+			}),
+			book_categories: book_categories.map((category) => {
+				return {
+					value: category.id,
+					label: category.name,
+				};
+			}),
+			book_authors: book_authors.map((author) => {
+				return {
+					value: author.id,
+					label: author.author_name,
+				};
+			}),
+		};
+
+		send200(data, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+// List of employees
 app.get("/all-admins-list", async (req, res) => {
 	// console.log(req);
 	await axios({
-		url: "http://127.0.0.1:1337/users",
+		url: `${STRAPI_URL}/users`,
 		method: "GET",
-		headers: {
-			Authorization: req.headers.authorization,
-		},
+		// headers: {
+		// 	Authorization: req.headers.authorization,
+		// },
 	})
 		.then((response) => {
 			// console.log("got fcken success");
 			// console.log(response.data);
 			// let sendData = response.data;
-			let sendData = response.data.filter(
-				(data) =>
-					data.user_role == 1 || data.user_role == 2 || data.user_role == 3
-			);
-			res.send(sendData);
+			let sendData = response.data.filter((data) => data.user_role == 1 || data.user_role == 2 || data.user_role == 3 || data.user_role == 4 || data.user_role == 5);
+			send200(sendData, res);
+			// res.send(sendData);
 		})
 		.catch((err) => {
 			console.log(err);
-			res.send({ response: "error" });
+			send400("error", res);
 		});
 });
 
+// List of employees who are don't have podcast channel
+app.get("/all-admins-settings", async (req, res) => {
+	// console.log(req);
+	await axios({
+		url: `${STRAPI_URL}/users?podcast_channel_null=true`,
+		method: "GET",
+		// headers: {
+		// 	Authorization: req.headers.authorization,
+		// },
+	})
+		.then((response) => {
+			let sendData = response.data.filter((data) => data.user_role == 1 || data.user_role == 2 || data.user_role == 3 || data.user_role == 4 || data.user_role == 5);
+			send200(sendData, res);
+		})
+		.catch((err) => {
+			console.log(err);
+			send400("error", res);
+		});
+});
+
+// Update employee information
 app.post("/update-employee", async (req, res) => {
 	// console.log(req);
 	let id = req.body.id;
@@ -198,125 +709,957 @@ app.post("/update-employee", async (req, res) => {
 		headers: {
 			Authorization: req.headers.authorization,
 		},
-		url: `http://127.0.0.1:1337/users/${id}`,
+		url: `${STRAPI_URL}/users/${id}`,
 		method: "PUT",
 		data: body,
 	})
 		.then((response) => {
 			// console.log("got fcken success");
 			// console.log(response.data);
-			res.send(response.data);
+			send200(response.data, res);
 		})
 		.catch((err) => {
 			console.log(err);
-			res.send({ response: "error" });
+			send400("error", res);
 		});
 });
 
+// List of podcast channels
 app.get("/podcast-channels", async (req, res) => {
 	await axios({
-		// headers: {
-		// 	Authorization: req.headers.authorization,
-		// },
-		url: `http://127.0.0.1:1337/podcast-channels`,
+		headers: {
+			Authorization: req.headers.authorization,
+		},
+		url: `${STRAPI_URL}/podcast-channels`,
 		method: "GET",
 	})
 		.then((response) => {
-			let sendableData = {
+			let sendData = {
 				podcastChannels: response.data
-					.map((data) => {
+					.map((data, index) => {
 						console.log(data);
 						return {
 							id: data.id,
+							pagination_number: index + 1,
+							is_featured: data.is_featured,
 							podcast_author: {
-								id: data.content_maker_id.id,
-								firstname: data.content_maker_id.firstname,
-								lastname: data.content_maker_id.lastname,
+								id: data.users_permissions_user?.id,
+								firstname: data.users_permissions_user?.fullname,
 							},
 							podcast_name: data.name,
-							podcast_pic_url: data.cover_pic.formats.small.url,
-							episode_count: data.podcast_eposides.length,
+							podcast_pic_url: data.cover_pic?.url,
+							episode_count: data.podcast_eposides?.length,
 							podcast_added_date: data.created_at,
+							channel_categories: data.podcast_categories,
 						};
 						// else return null;
 					})
-					.filter((data) => data),
+					.filter((data) => data)
+					.sort((channel1, channel2) => (channel1.is_featured === channel2.is_featured ? 0 : channel1.is_featured ? -1 : 1)),
 			};
-			res.send(sendableData);
-			// res.send(response.data);
+			send200(sendData, res);
 		})
 		.catch((err) => {
 			console.log(err);
-			res.send({ response: "error" });
+			send400("error", res);
 		});
 });
 
+// List of app users
 app.get("/all-app-users", async (req, res) => {
 	await axios({
-		url: "http://127.0.0.1:1337/users",
+		url: `${STRAPI_URL}/users`,
 		method: "GET",
 		headers: {
 			Authorization: req.headers.authorization,
 		},
 	})
 		.then((response) => {
-			let sendData = response.data.filter((data) => data.user_role == 4);
-			res.send(sendData);
+			let sendData = response.data.filter((data) => data.user_role == 6);
+			send200(sendData, res);
+			// res.send(sendData);
 		})
 		.catch((err) => {
-			console.log(err);
-			res.send({ response: "error" });
+			// console.log(err);
+			send400("error", res);
 		});
 });
 
-// app.get("/all-app-users", async (req, res) => {
-// 	await axios({
-// 		url: "http://127.0.0.1:1337/users",
-// 		method: "GET",
-// 		headers: {
-// 			Authorization: req.headers.authorization,
-// 		},
-// 	})
-// 		.then((response) => {
-// 			let sendData = response.data.filter((data) => data.user_role == 4);
-// 			res.send(sendData);
-// 		})
-// 		.catch((err) => {
-// 			console.log(err);
-// 			res.send({ response: "error" });
-// 		});
-// });
-
+// List of books
 app.get("/all-books-list", async (req, res) => {
-	await axios({
-		url: "http://127.0.0.1:1337/books",
-		method: "GET",
-		headers: {
-			Authorization: req.headers.authorization,
+	try {
+		let tempResponse = {
+			books: [],
+			authors: [],
+			categories: [],
+		};
+		let books = await axios({
+			url: `${STRAPI_URL}/books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error";
+		});
+
+		books = books.data;
+
+		tempResponse.books = books
+			.map((book, index) => {
+				return {
+					user_id: book.users_permissions_user.id,
+					id: book.id,
+					book_pic_url: book.picture?.url,
+					book_author_name: book.book_authors.map((author) => {
+						return author.author_name;
+					}),
+					book_added_date: book.created_at,
+					book_name: book.name,
+					has_mp3: book.has_audio,
+					has_pdf: book.has_pdf,
+					has_sale: book.has_sale,
+					is_featured: book.is_featured,
+					pagination_number: index + 1,
+				};
+			})
+			.sort((book1, book2) => (book1.is_featured === book2.is_featured ? 0 : book1.is_featured ? -1 : 1));
+
+		send200(tempResponse.books, res);
+	} catch (error) {
+		send400("error", res);
+	}
+});
+
+// ----------------------------- APP APIs -----------------------------
+
+app.post("/create-confirmation-code", async (req, res) => {
+	let confirmationCode = "xxxxxx".replace(/[xy]/g, function (c) {
+		var r = (Math.random() * 16) | 0,
+			v = c == "x" ? r : (r & 0x3) | 0x8;
+		return v.toString(16).toUpperCase();
+	});
+	// TODO create message service
+	let tempUniqueText = "xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx".replace(/[xy]/g, function (c) {
+		var r = (Math.random() * 16) | 0,
+			v = c == "x" ? r : (r & 0x3) | 0x8;
+		return v.toString(16).toUpperCase();
+	});
+	console.log(req.body);
+	axios({
+		url: `${STRAPI_URL}/users`,
+		method: "POST",
+		data: {
+			username: `${req.body.phone}`,
+			password: tempUniqueText,
+			email: `${tempUniqueText}@${tempUniqueText}.${tempUniqueText}`,
 		},
 	})
 		.then((response) => {
-			let tempResponse = response.data.map((temp) => {
-				return {
-					users_permissions_user: temp.users_permissions_user.id,
-					id: temp.id,
-					book_pic_url: temp.picture.url,
-					book_author_name: temp.book_author.name,
-					book_added_date: temp.created_at,
-					book_name: temp.name,
-					has_mp3: temp.has_audio,
-					has_pdf: temp.has_pdf,
-					has_sale: temp.has_sale,
-				};
-			});
-			res.send(tempResponse);
+			axios
+				.post(`${STRAPI_URL}/auth/local`, {
+					identifier: req.body.phone,
+					password: tempUniqueText,
+				})
+				.then((response) => {
+					axios({
+						url: `${STRAPI_URL}/users/${response.data.user.id}`,
+						method: "DELETE",
+						headers: {
+							Authorization: `Bearer ${response.data.jwt}`,
+						},
+					})
+						.then((response) => {
+							send200({ confirmationCode, phone: req.body.phone }, res);
+						})
+						.catch((err) => {
+							throw "error";
+						});
+				})
+				.catch((err) => {
+					throw "error";
+				});
+		})
+		.catch((err) => {
+			send400("error", res);
+		});
+});
+
+app.post("/app/check-email", async (req, res) => {
+	// TODO create message service
+	let tempUniqueText = "xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx".replace(/[xy]/g, function (c) {
+		var r = (Math.random() * 16) | 0,
+			v = c == "x" ? r : (r & 0x3) | 0x8;
+		return v.toString(16).toUpperCase();
+	});
+	axios({
+		url: `${STRAPI_URL}/users`,
+		method: "POST",
+		data: {
+			username: tempUniqueText,
+			password: tempUniqueText,
+			email: req.body.email,
+		},
+	})
+		.then((response) => {
+			axios
+				.post(`${STRAPI_URL}/auth/local`, {
+					identifier: tempUniqueText,
+					password: tempUniqueText,
+				})
+				.then((response) => {
+					axios({
+						url: `${STRAPI_URL}/users/${response.data.user.id}`,
+						method: "DELETE",
+						headers: {
+							Authorization: `Bearer ${response.data.jwt}`,
+						},
+					})
+						.then((response) => {
+							send200({}, res);
+						})
+						.catch((err) => {
+							throw "error";
+						});
+				})
+				.catch((err) => {
+					throw "error";
+				});
+		})
+		.catch((err) => {
+			send400("error", res);
+		});
+});
+
+app.post("/app/create-user", async (req, res) => {
+	axios({
+		url: `${STRAPI_URL}/users`,
+		method: "POST",
+		data: {
+			username: req.body.phoneNumber,
+			phone: req.body.phoneNumber,
+			password: req.body.password,
+			email: req.body.email,
+			gender: req.body.gender,
+			birthday: req.body.birthday,
+			fullname: req.body.fullName,
+			user_role: 6,
+		},
+	})
+		.then((response) => {
+			axios
+				.post(`${STRAPI_URL}/auth/local`, {
+					identifier: req.body.phoneNumber,
+					password: req.body.password,
+				})
+				.then((response) => {
+					send200(response.data, res);
+				})
+				.catch((err) => {
+					console.log("2nd");
+					throw "error";
+				});
 		})
 		.catch((err) => {
 			console.log(err);
-			res.send({ response: "error" });
+			console.log("1st");
+			send400("error", res);
 		});
 });
+
+app.get("/app/books/main", async (req, res) => {
+	console.log("book app");
+	try {
+		let responseData = {
+			bestBooks: [],
+			audioBooks: [],
+			categoriesWithBooks: [],
+			specialBook: null,
+		};
+
+		let books = await axios({
+			url: `${STRAPI_URL}/books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			// console.log(err);
+			throw err;
+		});
+
+		let book_categories = await axios({
+			url: `${STRAPI_URL}/book-categories`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw err;
+		});
+
+		let special_book = await axios({
+			url: `${STRAPI_URL}/special-book`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw err;
+		});
+
+		books = books.data;
+		book_categories = book_categories.data;
+		special_book = special_book.data;
+
+		books.forEach((book) => {
+			if (book.is_featured) {
+				responseData.bestBooks.push({
+					id: book.id,
+					picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
+				});
+			}
+			if (book.has_audio) {
+				let tempAuthorsString = "";
+				book.book_authors.forEach((author, index) => {
+					if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+					else tempAuthorsString += `${author.author_name}  `;
+				});
+
+				responseData.audioBooks.push({
+					id: book.id,
+					picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
+					authors: tempAuthorsString,
+					name: book.name,
+				});
+			}
+		});
+		book_categories.forEach((category) => {
+			let tempBooks = books
+				.filter((book) => {
+					let b = book.book_categories.filter((book_category) => category.id == book_category.id);
+					return b.length != 0;
+				})
+				.map((book) => {
+					let tempAuthorsString = "";
+					book.book_authors.forEach((author, index) => {
+						if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+						else tempAuthorsString += `${author.author_name}  `;
+					});
+
+					return {
+						id: book.id,
+						picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
+						authors: tempAuthorsString,
+						name: book.name,
+					};
+				});
+
+			// console.log(tempBooks);
+
+			responseData.categoriesWithBooks.push({
+				category_id: category.id,
+				category_name: category.name,
+				books: tempBooks,
+			});
+		});
+
+		if (special_book.book != null)
+			responseData.specialBook = {
+				id: special_book.book?.id,
+				picture: `${STRAPI_URL_IP}${special_book.book?.picture?.url}`,
+			};
+
+		send200(responseData, res);
+	} catch (error) {
+		send400("error", res);
+	}
+});
+
+app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
+	try {
+		let responseData = {
+			savedPodcastChannels: [],
+			latestPodcasts: [],
+			featuredPodcastChannels: [],
+			categoriesWithPodcastChannels: [],
+		};
+
+		let podcast_channels = await axios({
+			url: `${STRAPI_URL}/podcast-channels`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		let podcast_categories = await axios({
+			url: `${STRAPI_URL}/podcast-categories`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error2";
+		});
+
+		let saved_podcasts = await axios({
+			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.params.user_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error3";
+		});
+
+		let latest_podcasts = await axios({
+			url: `${STRAPI_URL}/podcast-episodes?_sort=created_at:DESC`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error3";
+		});
+
+		podcast_channels = podcast_channels.data;
+		podcast_categories = podcast_categories.data;
+		saved_podcasts = saved_podcasts.data;
+		latest_podcasts = latest_podcasts.data.slice(0, 12);
+
+		responseData.savedPodcastChannels = saved_podcasts.map((channel) => {
+			return {
+				id: channel.podcast_channel?.id,
+				name: channel.podcast_channel?.name,
+				picture: `${STRAPI_URL_IP}${channel.podcast_channel?.cover_pic?.url}`,
+			};
+		});
+
+		podcast_channels.forEach((channel) => {
+			if (channel.is_featured)
+				responseData.featuredPodcastChannels.push({
+					id: channel.id,
+					name: channel.name,
+					picture: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
+				});
+		});
+
+		latest_podcasts.forEach((podcast) => {
+			responseData.latestPodcasts.push({
+				id: podcast.id,
+				name: podcast.episode_name,
+				picture: `${STRAPI_URL_IP}${podcast.picture?.url}`,
+			});
+		});
+
+		podcast_categories.forEach((category) => {
+			let tempChannels = podcast_channels
+				.filter((channel) => {
+					let c = channel.podcast_categories.filter((podcast_category) => category.id == podcast_category.id);
+					return c.length != 0;
+				})
+				.map((channel) => {
+					return {
+						id: channel.id,
+						name: channel.name,
+						picture_path: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
+					};
+				});
+
+			responseData.categoriesWithPodcastChannels.push({
+				category_id: category.id,
+				category_name: category.name,
+				podcast_channels: tempChannels,
+			});
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/my-library/:user_id`, async (req, res) => {
+	try {
+		let responseData = {
+			podcastChannels: [],
+			books: [],
+			saved: [],
+		};
+
+		let podcast_channels = await axios({
+			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.params.user_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		let boughtBooks = await axios({
+			url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user.id=${req.params.user_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		podcast_channels = podcast_channels.data;
+		boughtBooks = boughtBooks.data;
+
+		responseData.podcastChannels = podcast_channels.map((channel) => {
+			return {
+				id: channel.podcast_channel.id,
+				name: channel.podcast_channel.name,
+				picture: `${STRAPI_URL_IP}${channel.podcast_channel.cover_pic?.url}`,
+			};
+		});
+
+		responseData.books = boughtBooks.map((boughtBook) => {
+			return {
+				id: boughtBook.book.id,
+				name: boughtBook.book.name,
+				picture: `${STRAPI_URL_IP}${boughtBook.book.picture?.url}`,
+				hasAudio: boughtBook.book.has_audio,
+				hasPdf: boughtBook.book.has_pdf,
+				hasSale: boughtBook.book.has_sale,
+			};
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/podcast-channel/:channel_id`, async (req, res) => {
+	try {
+		let responseData = {
+			channel: null,
+			episodes: [],
+			comments: [],
+		};
+
+		let saved_count = await axios({
+			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.params.channel_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error";
+		});
+
+		let channel = await axios({
+			url: `${STRAPI_URL}/podcast-channels/${req.params.channel_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error";
+		});
+
+		saved_count = saved_count.data.length;
+		channel = channel.data;
+
+		responseData.channel = {
+			id: channel.id,
+			name: channel.name,
+			description: channel.description,
+			picture: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
+			followers: saved_count,
+		};
+
+		responseData.episodes = channel.podcast_episodes.map((episode) => {
+			return {
+				id: episode.id,
+				name: episode.episode_name,
+				duration: episode.mp3_duration,
+				picture: `${STRAPI_URL_IP}${episode.picture?.url}`,
+				audioFile: `${STRAPI_URL_IP}${episode.audio_file_path?.url}`,
+			};
+		});
+		responseData.comments = channel.podcast_channel_comments.map((comment) => {
+			return {
+				id: comment.id,
+				userName: comment.user_name,
+				comment: comment.comment,
+				date: new Date(comment.created_at).toLocaleString(),
+			};
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
+	console.log("book single app");
+	console.log(req.params.book_id);
+	try {
+		let responseData = {
+			book: {},
+			imageComments: [],
+			comments: [],
+			relatedBooks: [],
+		};
+
+		let book = await axios({
+			url: `${STRAPI_URL}/books/${req.params.book_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		let sales_count = await axios({
+			url: `${STRAPI_URL}/customer-paid-ebooks?book.id=${req.params.book_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error2";
+		});
+
+		let customer_paid_ebooks = await axios({
+			url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error2";
+		});
+
+		let authorRequests = book.data.book_authors.map((author) => {
+			return `${STRAPI_URL}/books?book_authors_in=${author.id}`;
+		});
+
+		let related_books = [];
+
+		await axios.all(authorRequests.map((authorRequest) => axios.get(authorRequest))).then((...res) => {
+			res[0].forEach((r) => r.data.forEach((re) => related_books.push(re)));
+		});
+
+		book = book.data;
+		sales_count = sales_count.data.length;
+		customer_paid_ebooks = customer_paid_ebooks.data;
+
+		let tempAuthorsString = "";
+		book.book_authors.forEach((author, index) => {
+			if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+			else tempAuthorsString += `${author.author_name}  `;
+		});
+
+		responseData.book = {
+			id: book.id,
+			picture: `${STRAPI_URL_IP}${book.picture?.url}`,
+			name: book.name,
+			eBookPrice: book.online_book_price,
+			salesCount: sales_count,
+			hasAudio: book.has_audio,
+			hasPdf: book.has_pdf,
+			hasSale: book.has_sale,
+			authors: tempAuthorsString,
+			introduction: book.introduction,
+			youtubeIntroLink: book.youtube_intro,
+			is_paid: customer_paid_ebooks != 0,
+			pdfPath: customer_paid_ebooks != 0 ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
+		};
+
+		responseData.imageComments = book.picture_comment.map((comment) => {
+			return {
+				url: `${STRAPI_URL_IP}${comment.url}`,
+			};
+		});
+
+		responseData.comments = book.book_comments.map((comment) => {
+			return {
+				userName: comment.user_name,
+				date: new Date(comment.created_at).toLocaleDateString(),
+				comment: comment.comment,
+			};
+		});
+
+		related_books.forEach((book) => {
+			let isDuplicated = responseData.relatedBooks.filter((related_book) => related_book.id == book.id);
+			if (isDuplicated.length == 0)
+				responseData.relatedBooks.push({
+					id: book.id,
+					name: book.name,
+					picture: `${STRAPI_URL_IP}${book.picture?.url}`,
+				});
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+// ----------------------------- APP SEARCH APIs -----------------------------
+
+app.get(`/app/search/book/audio/:search`, async (req, res) => {
+	console.log("book search app");
+	console.log(req.params.search);
+	try {
+		let responseData = {
+			books: [],
+		};
+
+		let books = await axios({
+			url: `${STRAPI_URL}/books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		books = books.data;
+
+		books.forEach((book) => {
+			if (book.name.search(req.params.search) != -1 && book.has_audio) {
+				let tempAuthorsString = "";
+				book.book_authors.forEach((author, index) => {
+					if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+					else tempAuthorsString += `${author.author_name}  `;
+				});
+
+				responseData.books.push({
+					id: book.id,
+					name: book.name,
+					author: tempAuthorsString,
+				});
+			}
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/search/book/audio`, async (req, res) => {
+	console.log("book search all app");
+	try {
+		let responseData = {
+			books: [],
+		};
+
+		let books = await axios({
+			url: `${STRAPI_URL}/books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		books = books.data;
+
+		books.forEach((book) => {
+			if (book.has_audio) {
+				let tempAuthorsString = "";
+				book.book_authors.forEach((author, index) => {
+					if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+					else tempAuthorsString += `${author.author_name}  `;
+				});
+				responseData.books.push({
+					id: book.id,
+					name: book.name,
+					author: tempAuthorsString,
+				});
+			}
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/search/book/:search`, async (req, res) => {
+	console.log("book search app");
+	console.log(req.params.search);
+	try {
+		let responseData = {
+			books: [],
+		};
+
+		let books = await axios({
+			url: `${STRAPI_URL}/books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		books = books.data;
+
+		books.forEach((book) => {
+			if (book.name.search(req.params.search) != -1) {
+				let tempAuthorsString = "";
+				book.book_authors.forEach((author, index) => {
+					if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+					else tempAuthorsString += `${author.author_name}  `;
+				});
+
+				responseData.books.push({
+					id: book.id,
+					name: book.name,
+					author: tempAuthorsString,
+				});
+			}
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/search/book`, async (req, res) => {
+	console.log("book search all app");
+	try {
+		let responseData = {
+			books: [],
+		};
+
+		let books = await axios({
+			url: `${STRAPI_URL}/books`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		books = books.data;
+
+		responseData.books = books.map((book) => {
+			let tempAuthorsString = "";
+			book.book_authors.forEach((author, index) => {
+				if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+				else tempAuthorsString += `${author.author_name}  `;
+			});
+			return {
+				id: book.id,
+				name: book.name,
+				author: tempAuthorsString,
+			};
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/search/podcast`, async (req, res) => {
+	console.log("book podcast all app");
+	try {
+		let responseData = {
+			podcast_channels: [],
+		};
+
+		let podcast_channels = await axios({
+			url: `${STRAPI_URL}/podcast-channels`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		podcast_channels = podcast_channels.data;
+
+		responseData.podcast_channels = podcast_channels.map((channel) => {
+			return {
+				id: channel.id,
+				name: channel.name,
+			};
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/search/podcast/:search`, async (req, res) => {
+	console.log("book podcast search app");
+	try {
+		let responseData = {
+			podcast_channels: [],
+		};
+
+		let podcast_channels = await axios({
+			url: `${STRAPI_URL}/podcast-channels`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		podcast_channels = podcast_channels.data;
+
+		podcast_channels.forEach((channel) => {
+			if (channel.name.search(req.params.search) != -1)
+				responseData.podcast_channels.push({
+					id: channel.id,
+					name: channel.name,
+				});
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+// ----------------------------- UTILITY FUNCTIONs -----------------------------
+
+function getAge(dateString) {
+	var today = new Date();
+	var birthDate = new Date(dateString);
+	var age = today.getFullYear() - birthDate.getFullYear();
+	var m = today.getMonth() - birthDate.getMonth();
+	if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+		age--;
+	}
+	return age;
+}
+
+// SEND 400 with message
+function send400(message, res) {
+	res.status(400).send({ message });
+}
+
+// SEND 200 with data
+function send200(data, res) {
+	res.status(200).send(data);
+}
 
 app.listen(port, () => {
-	console.log(`Example app listening at http://localhost:${port}`);
+	console.log(`Listening at port ${port}`);
 });
