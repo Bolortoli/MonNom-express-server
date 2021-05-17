@@ -962,22 +962,22 @@ app.post("/create-confirmation-code", async (req, res) => {
 					})
 						.then(async (response) => {
 							//anhaa
-							var data = JSON.stringify({
-								From: "+15614139965",
-								Body: "Monnom App баталгаажуулах код: <#>" + confirmationCode,
-								To: "+976" + req.body.phone,
-							});
-							var config = {
-								method: "post",
-								url: "https://api.twilio.com/2010-04-01/Accounts/AC8cb810f12362aa5963b562138c3de4b5/Messages.json",
-								headers: {
-									Authorization: "Basic QUM4Y2I4MTBmMTIzNjJhYTU5NjNiNTYyMTM4YzNkZTRiNTplN2IzMmRiN2U4MDJlNzhkYWRjNTYzMzExODA0YmFmNg==",
+							
+
+							await axios({
+								'method': "post",
+								'url': "https://rest.nexmo.com/sms/json",
+								'headers': {
 									"Content-Type": "application/x-www-form-urlencoded",
 								},
-								data: data,
-							};
-
-							await axios(config)
+								'data': {
+									'from': "Monnom App",
+									'text': "Monnom App баталгаажуулах код: <#>" + confirmationCode,
+									'to': "976" + req.body.phone,
+									'api_key': "df4dd5e6",
+									'api_secret': "CzRciBLle0pUm6Nh",
+								},
+							})
 								.then(function (response) {
 									console.log(JSON.stringify(response.data));
 								})
