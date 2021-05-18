@@ -870,10 +870,16 @@ app.get("/app/live", async (req, res, next) => {
 // Statistics about dashboard
 app.get("/app/live/:channel_id", async (req, res, next) => {
 	try {
+		// let responseData = {
+		// 	episode_id: n,
+		// 	cureent_second,
+		// 	episodes: [],
+		// };
+
 		let responseData = {
-			mp3_file_path: null,
+			episode_id: null,
 			current_second: null,
-			audio_duration: null,
+			episodes: [],
 		};
 
 		let channel = await axios({
@@ -906,19 +912,22 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 		differce %= totalDuration;
 
 		// ------------ FIND CURRENT MP3 FILE PATH ------------
-		try {
-			channel_audio.forEach((audio) => {
-				if (differce < parseInt(audio.audio_duration)) {
-					responseData.current_second = parseInt(audio.audio_duration) - (parseInt(audio.audio_duration) - differce);
-					responseData.mp3_file_path = `${STRAPI_URL_IP}${audio.audio?.url}`;
-					responseData.audio_duration = parseInt(audio.audio_duration);
-				} else {
-					differce -= parseInt(audio.audio_duration);
-				}
-			});
-		} catch (error) {
-			console.log("loop STOPPED");
-		}
+		channel_audio.forEach((audio) => {
+			if (differce < parseInt(audio.audio_duration)) {
+				responseData.current_second = parseInt(audio.audio_duration) - (parseInt(audio.audio_duration) - differce);
+				responseData.episode_id = audio.id;
+			} else {
+				differce -= parseInt(audio.audio_duration);
+			}
+		});
+
+		responseData.episodes = channel_audio.map((episode) => {
+			return {
+				id: episode.id,
+				mp3_file_path: `${STRAPI_URL_IP}${episode.audio?.url}`,
+				duration: episode.audio_duration,
+			};
+		});
 
 		send200(responseData, res);
 	} catch (error) {
@@ -1452,15 +1461,19 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 			followers: saved_count,
 		};
 
-		responseData.episodes = channel.podcast_episodes.map((episode) => {
-			return {
-				id: episode.id,
-				name: episode.episode_name,
-				duration: episode.mp3_duration,
-				picture: `${STRAPI_URL_IP}${episode.picture?.url}`,
-				audioFile: `${STRAPI_URL_IP}${episode.audio_file_path?.url}`,
-			};
-		});
+		responseData.episodes = channel.podcast_episodes
+			.map((episode) => {
+				return {
+					id: episode.id,
+					name: episode.episode_name,
+					duration: episode.mp3_duration,
+					picture: `${STRAPI_URL_IP}${episode.picture?.url}`,
+					audioFile: `${STRAPI_URL_IP}${episode.audio_file_path?.url}`,
+					number: episode.episode_number,
+				};
+			})
+			.sort((episode1, episode2) => episode1.number - episode2.number);
+
 		responseData.comments = channel.podcast_channel_comments.map((comment) => {
 			return {
 				id: comment.id,
@@ -1479,33 +1492,127 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 	console.log("book single app");
 	console.log(req.params.book_id);
+	try {
+		let responseData = {
+			book: {},
+			imageComments: [],
+			comments: [],
+			relatedBooks: [],
+		};
+
+		let book = await axios({
+			url: `${STRAPI_URL}/books/${req.params.book_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		let sales_count = await axios({
+			url: `${STRAPI_URL}/customer-paid-ebooks?book.id=${req.params.book_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error2";
+		});
+
+		let customer_paid_ebooks = await axios({
+			url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
+		}).catch((err) => {
+			throw "error2";
+		});
+
+		let authorRequests = book.data.book_authors.map((author) => {
+			return `${STRAPI_URL}/books?book_authors_in=${author.id}`;
+		});
+
+		let related_books = [];
+
+		await axios.all(authorRequests.map((authorRequest) => axios.get(authorRequest))).then((...res) => {
+			res[0].forEach((r) => r.data.forEach((re) => related_books.push(re)));
+		});
+
+		book = book.data;
+		sales_count = sales_count.data.length;
+		customer_paid_ebooks = customer_paid_ebooks.data;
+
+		let tempAuthorsString = "";
+		book.book_authors.forEach((author, index) => {
+			if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
+			else tempAuthorsString += `${author.author_name}  `;
+		});
+
+		let is_paid = customer_paid_ebooks != 0;
+
+		responseData.book = {
+			id: book.id,
+			picture: `${STRAPI_URL_IP}${book.picture?.url}`,
+			name: book.name,
+			eBookPrice: book.online_book_price,
+			salesCount: sales_count,
+			hasAudio: book.has_audio,
+			hasPdf: book.has_pdf,
+			hasSale: book.has_sale,
+			authors: tempAuthorsString,
+			introduction: book.introduction,
+			youtubeIntroLink: book.youtube_intro,
+			is_paid: is_paid,
+			pdfPath: is_paid ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
+			audioChapters:
+				is_paid && book.has_audio
+					? book.book_audios?.map((chapter) => {
+							return {
+								id: chapter.id,
+								name: chapter.chapter_name,
+								duration: chapter.audio_duration,
+								number: chapter.number,
+							};
+					  })
+					: null,
+		};
+
+		responseData.imageComments = book.picture_comment.map((comment) => {
+			return {
+				url: `${STRAPI_URL_IP}${comment.url}`,
+			};
+		});
+
+		responseData.comments = book.book_comments.map((comment) => {
+			return {
+				userName: comment.user_name,
+				date: new Date(comment.created_at).toLocaleDateString(),
+				comment: comment.comment,
+			};
+		});
+
+		related_books.forEach((book) => {
+			let isDuplicated = responseData.relatedBooks.filter((related_book) => related_book.id == book.id);
+			if (isDuplicated.length == 0)
+				responseData.relatedBooks.push({
+					id: book.id,
+					name: book.name,
+					picture: `${STRAPI_URL_IP}${book.picture?.url}`,
+				});
+		});
+
+		send200({ responseData }, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get(`/app/unsave/podcast/:channel_id/:user_id`, async (req, res) => {
+	console.log("book single app");
+	console.log(req.params.book_id);
 	// try {
-	let responseData = {
-		book: {},
-		imageComments: [],
-		comments: [],
-		relatedBooks: [],
-	};
-
-	let book = await axios({
-		url: `${STRAPI_URL}/books/${req.params.book_id}`,
-		method: "GET",
-		// headers: {
-		// 	Authorization: `${req.headers.authorization}`,
-		// },
-	}).catch((err) => {
-		throw "error1";
-	});
-
-	let sales_count = await axios({
-		url: `${STRAPI_URL}/customer-paid-ebooks?book.id=${req.params.book_id}`,
-		method: "GET",
-		// headers: {
-		// 	Authorization: `Bearer ${req.headers.authorization}`,
-		// },
-	}).catch((err) => {
-		throw "error2";
-	});
 
 	let customer_paid_ebooks = await axios({
 		url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`,
@@ -1515,79 +1622,6 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 		// },
 	}).catch((err) => {
 		throw "error2";
-	});
-
-	let authorRequests = book.data.book_authors.map((author) => {
-		return `${STRAPI_URL}/books?book_authors_in=${author.id}`;
-	});
-
-	let related_books = [];
-
-	await axios.all(authorRequests.map((authorRequest) => axios.get(authorRequest))).then((...res) => {
-		res[0].forEach((r) => r.data.forEach((re) => related_books.push(re)));
-	});
-
-	book = book.data;
-	sales_count = sales_count.data.length;
-	customer_paid_ebooks = customer_paid_ebooks.data;
-
-	let tempAuthorsString = "";
-	book.book_authors.forEach((author, index) => {
-		if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
-		else tempAuthorsString += `${author.author_name}  `;
-	});
-
-	let is_paid = customer_paid_ebooks != 0;
-
-	responseData.book = {
-		id: book.id,
-		picture: `${STRAPI_URL_IP}${book.picture?.url}`,
-		name: book.name,
-		eBookPrice: book.online_book_price,
-		salesCount: sales_count,
-		hasAudio: book.has_audio,
-		hasPdf: book.has_pdf,
-		hasSale: book.has_sale,
-		authors: tempAuthorsString,
-		introduction: book.introduction,
-		youtubeIntroLink: book.youtube_intro,
-		is_paid: is_paid,
-		pdfPath: is_paid ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
-		audioChapters:
-			is_paid && book.has_audio
-				? book.book_audios?.map((chapter) => {
-						return {
-							id: chapter.id,
-							name: chapter.chapter_name,
-							duration: chapter.audio_duration,
-							number: chapter.number,
-						};
-				  })
-				: null,
-	};
-
-	responseData.imageComments = book.picture_comment.map((comment) => {
-		return {
-			url: `${STRAPI_URL_IP}${comment.url}`,
-		};
-	});
-
-	responseData.comments = book.book_comments.map((comment) => {
-		return {
-			userName: comment.user_name,
-			date: new Date(comment.created_at).toLocaleDateString(),
-			comment: comment.comment,
-		};
-	});
-
-	related_books.forEach((book) => {
-		let isDuplicated = responseData.relatedBooks.filter((related_book) => related_book.id == book.id);
-		if (isDuplicated.length == 0)
-			responseData.relatedBooks.push({
-				id: book.id,
-				name: book.name,
-				picture: `${STRAPI_URL_IP}${book.picture?.url}`,
-			});
 	});
 
 	send200({ responseData }, res);
