@@ -10,8 +10,8 @@ import fs from "fs";
 import * as client from "twilio";
 const app = express();
 const port = 3001;
-const STRAPI_URL = "http://10.150.0.150:1337";
-const STRAPI_URL_IP = "http://10.150.0.150:1337";
+const STRAPI_URL = "http://10.150.0.161:1337";
+const STRAPI_URL_IP = "http://10.150.0.161:1337";
 const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
 const authToken = "e7b32db7e802e78dadc563311804baf6";
 
@@ -572,14 +572,14 @@ app.post("/admin-login", async (req, res) => {
 			password: req.body.password,
 		})
 		.then((response) => {
+			console.log("success");
 			send200(response.data, res);
 			// res.send(response.data);
 		})
 		.catch((err) => {
-			// console.log(err);
+			console.log(err);
 			send400("error", res);
 		});
-	console.log(req.body);
 });
 
 app.get("/settings-page", async (req, res) => {
@@ -870,12 +870,6 @@ app.get("/app/live", async (req, res, next) => {
 // Statistics about dashboard
 app.get("/app/live/:channel_id", async (req, res, next) => {
 	try {
-		// let responseData = {
-		// 	episode_id: n,
-		// 	cureent_second,
-		// 	episodes: [],
-		// };
-
 		let responseData = {
 			episode_id: null,
 			current_second: null,
