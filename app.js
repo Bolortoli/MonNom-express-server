@@ -10,8 +10,8 @@ import fs from "fs";
 import * as client from "twilio";
 const app = express();
 const port = 3001;
-const STRAPI_URL = "http://10.150.0.161:1337";
-const STRAPI_URL_IP = "http://10.150.0.161:1337";
+const STRAPI_URL = "http://10.150.0.232:1337";
+const STRAPI_URL_IP = "http://10.150.0.232:1337";
 const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
 const authToken = "e7b32db7e802e78dadc563311804baf6";
 
@@ -31,8 +31,13 @@ const upload = multer({ storage: fileStorageEngine });
 
 // ----------------------------- WEBSITE APIs -----------------------------
 
+app.post("/payment-callback", (req, res, next) => {
+	console.log(req.body);
+	send200({}, res);
+});
+
 // Statistics about dashboard
-app.get("/dashboard/", async (req, res, next) => {
+app.get("/dashboard", async (req, res, next) => {
 	try {
 		let responseData = {
 			totalPodcastChannels: 0,
@@ -63,9 +68,9 @@ app.get("/dashboard/", async (req, res, next) => {
 		let customer_saved_books = await axios({
 			url: `${STRAPI_URL}/customer-paid-books`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: req.headers.authorization,
+			},
 		}).catch((err) => {
 			throw "error saved books";
 		});
@@ -73,9 +78,9 @@ app.get("/dashboard/", async (req, res, next) => {
 		let customer_saved_ebooks = await axios({
 			url: `${STRAPI_URL}/customer-paid-ebooks`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: req.headers.authorization,
+			},
 		}).catch((err) => {
 			throw "error saved ebooks";
 		});
@@ -83,9 +88,9 @@ app.get("/dashboard/", async (req, res, next) => {
 		let podcast_channels = await axios({
 			url: `${STRAPI_URL}/podcast-channels`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: req.headers.authorization,
+			},
 		}).catch((err) => {
 			throw "error podcast channels";
 		});
@@ -93,9 +98,9 @@ app.get("/dashboard/", async (req, res, next) => {
 		let podcast_channels_saves = await axios({
 			url: `${STRAPI_URL}/user-saved-podcasts`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: req.headers.authorization,
+			},
 		}).catch((err) => {
 			throw "error saved podcasts";
 		});
@@ -103,9 +108,9 @@ app.get("/dashboard/", async (req, res, next) => {
 		let totalRadioChannels = await axios({
 			url: `${STRAPI_URL}/radio-channels/count`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: req.headers.authorization,
+			},
 		}).catch((err) => {
 			throw "error radio";
 		});
@@ -113,9 +118,9 @@ app.get("/dashboard/", async (req, res, next) => {
 		let books = await axios({
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: req.headers.authorization,
+			},
 		}).catch((err) => {
 			throw "error books";
 		});
@@ -123,9 +128,9 @@ app.get("/dashboard/", async (req, res, next) => {
 		let app_users = await axios({
 			url: `${STRAPI_URL}/users?user_role=6`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: req.headers.authorization,
+			},
 		}).catch((err) => {
 			throw "error users";
 		});
@@ -663,9 +668,9 @@ app.get("/all-admins-list", async (req, res) => {
 	await axios({
 		url: `${STRAPI_URL}/users`,
 		method: "GET",
-		// headers: {
-		// 	Authorization: req.headers.authorization,
-		// },
+		headers: {
+			Authorization: req.headers.authorization,
+		},
 	})
 		.then((response) => {
 			// console.log("got fcken success");
@@ -810,7 +815,7 @@ app.get("/all-books-list", async (req, res) => {
 		tempResponse.books = books
 			.map((book, index) => {
 				return {
-					user_id: book.users_permissions_user.id,
+					user_id: book.users_permissions_user?.id,
 					id: book.id,
 					book_pic_url: book.picture?.url,
 					book_author_name: book.book_authors.map((author) => {
@@ -834,6 +839,61 @@ app.get("/all-books-list", async (req, res) => {
 });
 
 // ----------------------------- APP APIs -----------------------------
+
+// Unsave podcast channel
+app.post("/app/unsave-podcast-channel", async (req, res, next) => {
+	try {
+		console.log("unsave podcast channel");
+		let saves = [];
+		let saved_podcasts = await axios({
+			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.body.channel_id}&users_permissions_user=${req.body.user_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error";
+		});
+		saved_podcasts = saved_podcasts.data;
+
+		saved_podcasts.forEach((podcast) => {
+			saves.push(`${STRAPI_URL}/user-saved-podcasts/${podcast.id}`);
+		});
+
+		console.log(saves);
+		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, {})));
+		send200({}, res);
+	} catch (error) {
+		send400("error", res);
+	}
+});
+
+app.post("/app/unsave-book", async (req, res, next) => {
+	try {
+		console.log("unsave podcast channel");
+		let saves = [];
+		let saved_podcasts = await axios({
+			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.body.user_id}&book.id=${req.body.book_id}`,
+			method: "GET",
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error";
+		});
+		saved_podcasts = saved_podcasts.data;
+
+		saved_podcasts.forEach((podcast) => {
+			saves.push(`${STRAPI_URL}/user-saved-books/${podcast.id}`);
+		});
+
+		console.log(saves);
+		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, {})));
+		send200({}, res);
+	} catch (error) {
+		send400("error", res);
+	}
+});
 
 // all channels list
 app.get("/app/live", async (req, res, next) => {
@@ -930,69 +990,74 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 });
 
 app.post("/create-confirmation-code", async (req, res) => {
-	let confirmationCode = "xxxxxx".replace(/[xy]/g, function (c) {
-		var r = (Math.random() * 16) | 0,
-			v = c == "x" ? r : (r & 0x3) | 0x8;
-		return v.toString(16).toUpperCase();
-	});
-	// TODO create message service
-	let tempUniqueText = "xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx".replace(/[xy]/g, function (c) {
-		var r = (Math.random() * 16) | 0,
-			v = c == "x" ? r : (r & 0x3) | 0x8;
-		return v.toString(16).toUpperCase();
-	});
-	console.log(req.body);
-	axios({
-		url: `${STRAPI_URL}/users`,
-		method: "POST",
-		data: {
-			username: `${req.body.phone}`,
-			password: tempUniqueText,
-			email: `${tempUniqueText}@${tempUniqueText}.${tempUniqueText}`,
-		},
-	})
-		.then((response) => {
-			axios
-				.post(`${STRAPI_URL}/auth/local`, {
-					identifier: req.body.phone,
-					password: tempUniqueText,
-				})
-				.then((response) => {
-					axios({
-						url: `${STRAPI_URL}/users/${response.data.user.id}`,
-						method: "DELETE",
-						headers: {
-							Authorization: `Bearer ${response.data.jwt}`,
-						},
-					})
-						.then((response) => {
-							//anhaa
-							//const Client = client("AC8cb810f12362aa5963b562138c3de4b5", "e7b32db7e802e78dadc563311804baf6");
-							require("twilio")("AC8cb810f12362aa5963b562138c3de4b5", "c540e739b0a9177be35483086b1b73a2")
-								.messages.create({
-									body: "Monnom App баталгаажуулах код: <#>" + confirmationCode,
-									from: "+15614139965",
-									to: "+97680085517",
-								})
-								.then((message) => console.log(message.sid))
-								.catch((e) => console.log(e));
-							// .catch((e) => {
-							// 	throw "error";
-							// });
-							console.log(cl);
-							send200({ confirmationCode, phone: req.body.phone }, res);
-						})
-						.catch((err) => {
-							throw "error";
-						});
-				})
-				.catch((err) => {
-					throw "error";
-				});
-		})
-		.catch((err) => {
-			send400("error", res);
+	console.log("cofirmation");
+	try {
+		let confirmationCode = "xxxxxx".replace(/[xy]/g, function (c) {
+			var r = (Math.random() * 16) | 0,
+				v = c == "x" ? r : (r & 0x3) | 0x8;
+			return v.toString(16).toUpperCase();
 		});
+		// TODO create message service
+		let tempUniqueText = "xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx".replace(/[xy]/g, function (c) {
+			var r = (Math.random() * 16) | 0,
+				v = c == "x" ? r : (r & 0x3) | 0x8;
+			return v.toString(16).toUpperCase();
+		});
+		console.log(req.body);
+		axios({
+			url: `${STRAPI_URL}/users`,
+			method: "POST",
+			data: {
+				username: `${req.body.phone}`,
+				password: tempUniqueText,
+				email: `${tempUniqueText}@${tempUniqueText}.${tempUniqueText}`,
+			},
+		})
+			.then((response) => {
+				axios
+					.post(`${STRAPI_URL}/auth/local`, {
+						identifier: req.body.phone,
+						password: tempUniqueText,
+					})
+					.then((response) => {
+						axios({
+							url: `${STRAPI_URL}/users/${response.data.user.id}`,
+							method: "DELETE",
+							headers: {
+								Authorization: `Bearer ${response.data.jwt}`,
+							},
+						})
+							.then((response) => {
+								//anhaa
+								//const Client = client("AC8cb810f12362aa5963b562138c3de4b5", "e7b32db7e802e78dadc563311804baf6");
+								// require("twilio")("AC8cb810f12362aa5963b562138c3de4b5", "c540e739b0a9177be35483086b1b73a2")
+								// 	.messages.create({
+								// 		body: "Monnom App баталгаажуулах код: <#>" + confirmationCode,
+								// 		from: "+15614139965",
+								// 		to: "+97680085517",
+								// 	})
+								// 	.then((message) => console.log(message.sid))
+								// 	.catch((e) => console.log(e));
+								// .catch((e) => {
+								// 	throw "error";
+								// });
+								// console.log(cl);
+								send200({ confirmationCode, phone: req.body.phone }, res);
+							})
+							.catch((err) => {
+								throw "error";
+							});
+					})
+					.catch((err) => {
+						throw "error";
+					});
+			})
+			.catch((err) => {
+				throw "error";
+			});
+	} catch (error) {
+		send400("error", res);
+	}
 });
 
 app.post("/app/check-email", async (req, res) => {
@@ -1582,7 +1647,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 		responseData.comments = book.book_comments.map((comment) => {
 			return {
 				userName: comment.user_name,
-				date: new Date(comment.created_at).toLocaleDateString(),
+				date: new Date(comment.created_at).toLocaleString(),
 				comment: comment.comment,
 			};
 		});
@@ -1601,27 +1666,6 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 	} catch (error) {
 		send400(error, res);
 	}
-});
-
-app.get(`/app/unsave/podcast/:channel_id/:user_id`, async (req, res) => {
-	console.log("book single app");
-	console.log(req.params.book_id);
-	// try {
-
-	let customer_paid_ebooks = await axios({
-		url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`,
-		method: "GET",
-		// headers: {
-		// 	Authorization: `Bearer ${req.headers.authorization}`,
-		// },
-	}).catch((err) => {
-		throw "error2";
-	});
-
-	send200({ responseData }, res);
-	// } catch (error) {
-	// 	send400(error, res);
-	// }
 });
 
 // ----------------------------- APP SEARCH APIs -----------------------------
