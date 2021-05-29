@@ -318,6 +318,7 @@ app.get("/book-single-by-author/:id", async (req, res, next) => {
 							book_comments: book.book_comments,
 							is_featured: book.is_featured,
 							online_book_price: book.online_book_price,
+							audio_book_price: book.audio_book_price,
 							book_price: book.book_price,
 							sale_quantity: book.sale_quantity,
 							book_sales_count: 0,
