@@ -1,4 +1,4 @@
-import express, { response } from "express";
+import express from "express";
 import axios from "axios";
 import bodyParser from "body-parser";
 import cors from "cors";
@@ -9,9 +9,9 @@ import http from "http";
 import fs from "fs";
 import * as client from "twilio";
 const app = express();
-const port = 3001;
-const STRAPI_URL = "http://10.150.0.232:1337";
-const STRAPI_URL_IP = "http://10.150.0.232:1337";
+const port = 3000;
+const STRAPI_URL = "https://strapi.monnom.mn";
+const STRAPI_URL_IP = "https://strapi.monnom.mn";
 const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
 const authToken = "e7b32db7e802e78dadc563311804baf6";
 
