@@ -9,7 +9,7 @@ import http from "http";
 import fs from "fs";
 import * as client from "twilio";
 const app = express();
-const port = 3000;
+const port = 3001;
 const STRAPI_URL = "https://strapi.monnom.mn";
 const STRAPI_URL_IP = "https://strapi.monnom.mn";
 const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
@@ -254,6 +254,40 @@ app.get("/dashboard", async (req, res, next) => {
 		responseData.mostBoughtBooks = tempBooks;
 
 		send200(responseData, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
+app.get("/book-add-informations", async (req, res, next) => {
+	try {
+		let sendData = {
+			available_authors: null,
+			available_categories: null,
+		};
+		let authors = await axios({
+			method: "GET",
+			url: `${STRAPI_URL}/book-authors`,
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error-authors";
+		});
+		let categories = await axios({
+			method: "GET",
+			url: `${STRAPI_URL}/book-categories`,
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "error-categpries";
+		});
+
+		sendData.available_categories = authors.data;
+		sendData.available_authors = categories.data;
+
+		send200(sendData, res);
 	} catch (error) {
 		send400(error, res);
 	}
