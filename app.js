@@ -8,6 +8,7 @@ import path, { dirname } from "path";
 import http from "http";
 import fs from "fs";
 import * as client from "twilio";
+
 const app = express();
 const port = 3001;
 const STRAPI_URL = "https://strapi.monnom.mn";
@@ -944,16 +945,17 @@ app.get("/app/live", async (req, res, next) => {
 			// 	Authorization: req.headers.authorization,
 			// },
 		}).catch((err) => {
-			throw "error saved books";
+			throw "error fetch data";
 		});
 
 		channel = channel.data;
 
-		responseData.channelsList = channel.map((c) => {
-			return {
-				id: c.id,
-				name: c.name,
-			};
+		channel.forEach((c) => {
+			if (c.is_active)
+				responseData.channelsList.push({
+					id: c.id,
+					name: c.name,
+				});
 		});
 
 		send200(responseData, res);
@@ -962,7 +964,7 @@ app.get("/app/live", async (req, res, next) => {
 	}
 });
 
-// Statistics about dashboard
+// Radio channel single
 app.get("/app/live/:channel_id", async (req, res, next) => {
 	try {
 		let responseData = {
@@ -1024,6 +1026,7 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 	}
 });
 
+// Check if phone number can be username, then create confirmation code
 app.post("/create-confirmation-code", async (req, res) => {
 	console.log("cofirmation");
 	try {
@@ -1141,6 +1144,7 @@ app.post("/app/check-email", async (req, res) => {
 		});
 });
 
+// Create customer
 app.post("/app/create-user", async (req, res) => {
 	axios({
 		url: `${STRAPI_URL}/users`,
@@ -1177,6 +1181,7 @@ app.post("/app/create-user", async (req, res) => {
 		});
 });
 
+//
 app.get("/app/books/main/:user_id", async (req, res) => {
 	console.log("book app");
 	try {
