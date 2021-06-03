@@ -8,12 +8,13 @@ import path, { dirname } from "path";
 import http from "http";
 import fs from "fs";
 import * as client from "twilio";
+import dotenv from 'dotenv';
+dotenv.config();
+
 const app = express();
 const port = 3000;
-const STRAPI_URL = "https://strapi.monnom.mn";
-const STRAPI_URL_IP = "https://strapi.monnom.mn";
-const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
-const authToken = "e7b32db7e802e78dadc563311804baf6";
+const STRAPI_URL = process.env.STRAPI_URL;
+const STRAPI_URL_IP = process.env.STRAPI_URL_IP;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -1628,13 +1629,13 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			audioChapters:
 				is_paid && book.has_audio
 					? book.book_audios?.map((chapter) => {
-							return {
-								id: chapter.id,
-								name: chapter.chapter_name,
-								duration: chapter.audio_duration,
-								number: chapter.number,
-							};
-					  })
+						return {
+							id: chapter.id,
+							name: chapter.chapter_name,
+							duration: chapter.audio_duration,
+							number: chapter.number,
+						};
+					})
 					: null,
 		};
 
