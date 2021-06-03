@@ -11,13 +11,29 @@ import * as client from "twilio";
 
 const app = express();
 const port = 3001;
+
 const STRAPI_URL = "https://strapi.monnom.mn";
 const STRAPI_URL_IP = "https://strapi.monnom.mn";
+
+// For OTP
 const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
 const authToken = "e7b32db7e802e78dadc563311804baf6";
 
+// For payment
+const QPAY_MERCHANT_USERNAME = "HAN_AQUA";
+const QPAY_MERCHANT_PASSWORD = "UOaod0R9";
+const QPAY_MERCHANT_INVOICE_NAME = "HANAQUA_INVOICE";
+const QPAY_MERCHANT = "https://merchant.qpay.mn/v2/invoice";
+const QPAY_MERCHANT_AUTHENTICATION = "https://merchant.qpay.mn/v2/auth/token";
+
+// Book payment types
+const PAYMENT_EBOOK_MAGIC_WORD = "ebook";
+const PAYMENT_AUDIO_BOOK_MAGIC_WORD = "audio-book";
+const PAYMENT_BOOK_MAGIC_WORD = "book";
+
 app.use(cors());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 const fileStorageEngine = multer.diskStorage({
 	destination: (req, file, cb) => {
@@ -30,12 +46,106 @@ const fileStorageEngine = multer.diskStorage({
 
 const upload = multer({ storage: fileStorageEngine });
 
-// ----------------------------- WEBSITE APIs -----------------------------
+// ----------------------------- PAYEMNT APIs -----------------------------
 
-app.post("/payment-callback", (req, res, next) => {
-	console.log(req.body);
+app.post("/app/create-invoice/ebook", async (req, res, next) => {
+	try {
+		console.log(req.body);
+		let tempInvoiceId = create_temp_unique_text("xxxxxx-xxxxxx");
+
+		// Get QPAY access token
+		let qpay_access = await axios({
+			method: "POST",
+			url: QPAY_MERCHANT_AUTHENTICATION,
+			auth: {
+				username: QPAY_MERCHANT_USERNAME,
+				password: QPAY_MERCHANT_PASSWORD,
+			},
+		}).catch((err) => {
+			throw "QPAY authorization failed";
+		});
+
+		// For get book price
+		let book = await axios({
+			method: "GET",
+			url: `${STRAPI_URL}/books/${req.body.book_id}`,
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
+		}).catch((err) => {
+			throw "Fetch book failed";
+		});
+
+		qpay_access = qpay_access.data;
+		book = book.data;
+
+		let qpay_invoice_creation = await axios({
+			method: "POST",
+			url: QPAY_MERCHANT,
+			headers: {
+				Authorization: `Bearer ${qpay_access.access_token}`,
+			},
+			data: {
+				invoice_code: QPAY_MERCHANT_INVOICE_NAME,
+				sender_invoice_no: tempInvoiceId,
+				invoice_receiver_code: req.body.user_id.toString(),
+				invoice_description: `Monnom Audio Book - ${req.body.book_name} төлбөр.`,
+				invoice_receiver_data: {
+					register: "TA89102712",
+					name: "Бат",
+					email: "www.monnom.mn@gmail.mn",
+					phone: "99887766",
+				},
+				amount: book.online_book_price,
+				callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}`,
+			},
+		});
+
+		await axios({
+			method: "POST",
+			url: `${STRAPI_URL}/payments`,
+			// headers: {
+			// 	Authorization: `${qpay_access.token_type} ${qpay_access.access_token}`,
+			// },
+			data: {
+				users_permissions_user: req.body.user_id,
+				payment_amount: book.online_book_price,
+				is_approved: false,
+				book_payment_type: PAYMENT_EBOOK_MAGIC_WORD,
+				book: req.body.book_id,
+				invoice_id: tempInvoiceId,
+			},
+		}).catch(() => {
+			throw "Save payment failed";
+		});
+
+		// hide invoice_id from client so that they can't hack it
+		let response_data = { ...qpay_invoice_creation.data };
+		delete response_data["invoice_id"];
+		send200(response_data, res);
+	} catch (error) {
+		console.log("err");
+		console.log(error);
+		send400(error, res);
+	}
+});
+
+app.get("/payment-callback/:invoice_id", async (req, res, next) => {
+	const invoice_id = req.params.invoice_id;
+	const paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`);
+	const payment = paymentResponse.data[0];
+	try {
+		const paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${payment.id}`, { is_approved: true, payment_data: JSON.stringify(req.body) });
+		send200(paymentUpdateResponse.data, res);
+	} catch (e) {
+		send200(e, res);
+	}
 	send200({}, res);
 });
+
+// ----------------------------- PAYEMNT APIs -----------------------------
+
+// ----------------------------- WEBSITE APIs -----------------------------
 
 // Statistics about dashboard
 app.get("/dashboard", async (req, res, next) => {
@@ -1030,17 +1140,10 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 app.post("/create-confirmation-code", async (req, res) => {
 	console.log("cofirmation");
 	try {
-		let confirmationCode = "xxxxxx".replace(/[xy]/g, function (c) {
-			var r = (Math.random() * 16) | 0,
-				v = c == "x" ? r : (r & 0x3) | 0x8;
-			return v.toString(16).toUpperCase();
-		});
+		let confirmationCode = create_temp_unique_text("xxxxxx");
+
 		// TODO create message service
-		let tempUniqueText = "xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx".replace(/[xy]/g, function (c) {
-			var r = (Math.random() * 16) | 0,
-				v = c == "x" ? r : (r & 0x3) | 0x8;
-			return v.toString(16).toUpperCase();
-		});
+		let tempUniqueText = create_temp_unique_text("xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx");
 		console.log(req.body);
 		axios({
 			url: `${STRAPI_URL}/users`,
@@ -1958,6 +2061,14 @@ function send400(message, res) {
 // SEND 200 with data
 function send200(data, res) {
 	res.status(200).send(data);
+}
+
+function create_temp_unique_text(format) {
+	return format.replace(/[xy]/g, function (c) {
+		var r = (Math.random() * 16) | 0,
+			v = c == "x" ? r : (r & 0x3) | 0x8;
+		return v.toString(16).toUpperCase();
+	});
 }
 
 app.listen(port, () => {
