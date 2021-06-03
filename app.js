@@ -48,9 +48,25 @@ const upload = multer({ storage: fileStorageEngine });
 
 // ----------------------------- PAYEMNT APIs -----------------------------
 
-app.post("/app/create-invoice/ebook", async (req, res, next) => {
+app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	try {
-		console.log(req.body);
+		let model_name;
+
+		switch (req.params.payment_type) {
+			case PAYMENT_EBOOK_MAGIC_WORD:
+				model_name = "customer-paid-ebooks";
+				break;
+			case PAYMENT_AUDIO_BOOK_MAGIC_WORD:
+				model_name = "customer-paid-audio-books";
+				break;
+
+			case PAYMENT_BOOK_MAGIC_WORD:
+				model_name = "customer-paid-books";
+				break;
+			default:
+				throw "Magic word not founds";
+		}
+
 		let tempInvoiceId = create_temp_unique_text("xxxxxx-xxxxxx");
 
 		// Get QPAY access token
@@ -97,7 +113,7 @@ app.post("/app/create-invoice/ebook", async (req, res, next) => {
 					phone: "99887766",
 				},
 				amount: book.online_book_price,
-				callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}`,
+				callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}`,
 			},
 		});
 
@@ -111,7 +127,7 @@ app.post("/app/create-invoice/ebook", async (req, res, next) => {
 				users_permissions_user: req.body.user_id,
 				payment_amount: book.online_book_price,
 				is_approved: false,
-				book_payment_type: PAYMENT_EBOOK_MAGIC_WORD,
+				book_payment_type: req.params.payment_type,
 				book: req.body.book_id,
 				invoice_id: tempInvoiceId,
 			},
@@ -130,17 +146,52 @@ app.post("/app/create-invoice/ebook", async (req, res, next) => {
 	}
 });
 
-app.get("/payment-callback/:invoice_id", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
+	// try {
 	const invoice_id = req.params.invoice_id;
-	const paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`);
-	const payment = paymentResponse.data[0];
+	let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
+		throw "Fetching payment failed";
+	});
+	paymentResponse = paymentResponse.data[0];
+
+	let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body) + "get" }).catch((err) => {
+		throw "Paymet update failed";
+	});
+
+	paymentUpdateResponse = paymentUpdateResponse.data;
+
+	await axios.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {}).catch((err) => {
+		throw "Payment creation failed";
+	});
+	send200(paymentUpdateResponse, res);
+	// } catch (e) {
+	// 	send400(e, res);
+	// }
+});
+
+app.post("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
 	try {
-		const paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${payment.id}`, { is_approved: true, payment_data: JSON.stringify(req.body) });
-		send200(paymentUpdateResponse.data, res);
+		const invoice_id = req.params.invoice_id;
+		let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
+			throw "Fetching payment failed";
+		});
+		paymentResponse = paymentResponse.data[0];
+
+		let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body) + "post" }).catch((err) => {
+			throw "Paymet update failed";
+		});
+
+		paymentUpdateResponse = paymentUpdateResponse.data;
+
+		await axios.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
+			book: paymentUpdateResponse.book.id,
+			users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
+			payment: paymentUpdateResponse.id,
+		});
+		send200(paymentUpdateResponse, res);
 	} catch (e) {
-		send200(e, res);
+		send400(e, res);
 	}
-	send200({}, res);
 });
 
 // ----------------------------- PAYEMNT APIs -----------------------------
