@@ -144,26 +144,28 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 });
 
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
-	// try {
-	const invoice_id = req.params.invoice_id;
-	let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
-		throw "Fetching payment failed";
-	});
-	paymentResponse = paymentResponse.data[0];
+	try {
+		const invoice_id = req.params.invoice_id;
+		let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
+			throw "Fetching payment failed";
+		});
+		paymentResponse = paymentResponse.data[0];
 
-	let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body) + "get" }).catch((err) => {
-		throw "Paymet update failed";
-	});
+		let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get" }).catch((err) => {
+			throw "Paymet update failed";
+		});
 
-	paymentUpdateResponse = paymentUpdateResponse.data;
+		paymentUpdateResponse = paymentUpdateResponse.data;
 
-	await axios.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {}).catch((err) => {
-		throw "Payment creation failed";
-	});
-	send200(paymentUpdateResponse, res);
-	// } catch (e) {
-	// 	send400(e, res);
-	// }
+		await axios.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
+			book: paymentUpdateResponse.book.id,
+			users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
+			payment: paymentUpdateResponse.id,
+		});
+		send200(paymentUpdateResponse, res);
+	} catch (e) {
+		send400(e, res);
+	}
 });
 
 app.post("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
