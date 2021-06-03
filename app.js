@@ -143,7 +143,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-app.get("/payment/payment//:invoice_id/:payment_collection_name", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
 	try {
 		const invoice_id = req.params.invoice_id;
 		let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
