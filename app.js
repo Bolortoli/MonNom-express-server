@@ -143,6 +143,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
+// qpay payment callback
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
 	try {
 		const invoice_id = req.params.invoice_id;
@@ -162,6 +163,32 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 			users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
 			payment: paymentUpdateResponse.id,
 		});
+
+		try {
+			///// try to send notification
+			// get user by id
+			console.log('send notification');
+			const { data } = await axios.get(`${STRAPI_URL}/users/${paymentUpdateResponse.users_permissions_user.id}`);
+			// get fcm token
+			const fcmToken = data.fcm_token;
+			// send notification
+			await axios({
+				url: 'https://fcm.googleapis.com/fcm/send',
+				method: 'POST',
+				headers: {
+					Authorization: `key=${process.env.FCM_SERVER_KEY}`
+				},
+				data: {
+					"registration_ids": [fcmToken],
+					"channel_id": "fcm_default_channel",
+					"data": {
+						"book_id": paymentUpdateResponse.book.id,
+					}
+				}
+			});
+		} catch (e) {
+
+		}
 		send200(paymentUpdateResponse, res);
 	} catch (e) {
 		send400(e, res);
