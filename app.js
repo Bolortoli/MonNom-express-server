@@ -1831,6 +1831,17 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		let is_paid = customer_paid_ebooks != 0;
 
+		let clientPdfPath = null;
+		if (is_paid && book.pdf_book_path?.url) {
+			if (book.pdf_book_path?.url[0] === '/') {
+				// /upload/... ???
+				clientPdfPath = `${STRAPI_URL_IP}${book.pdf_book_path?.url}`;
+			} else {
+				// expects s3 url
+				clientPdfPath = book.pdf_book_path?.url
+			}
+		}
+
 		responseData.book = {
 			id: book.id,
 			picture: `${STRAPI_URL_IP}${book.picture?.url}`,
@@ -1844,7 +1855,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			introduction: book.introduction,
 			youtubeIntroLink: book.youtube_intro,
 			is_paid: is_paid,
-			pdfPath: is_paid ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
+			pdfPath: clientPdfPath,
 			audioChapters:
 				is_paid && book.has_audio
 					? book.book_audios?.map((chapter) => {
