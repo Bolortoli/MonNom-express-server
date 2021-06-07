@@ -1375,7 +1375,9 @@ app.post("/app/create-user", async (req, res) => {
 
 //
 app.get("/app/books/main/:user_id", async (req, res) => {
-	console.log("book app");
+	if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+		req.headers.authorization = req.headers.authorization.split(' ')[1]
+	}
 	try {
 		let responseData = {
 			bestBooks: [],
@@ -1392,7 +1394,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			},
 		}).catch((err) => {
 			// console.log(err);
-			throw err;
+			console.log(err)
 		});
 
 		let book_categories = await axios({
@@ -1402,7 +1404,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			throw err;
+			console.log(err)
 		});
 
 		let user_saved_books = await axios({
@@ -1412,7 +1414,8 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			throw err;
+			console.log(err)
+			console.log(err)
 		});
 
 		let special_book = await axios({
@@ -1422,13 +1425,14 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			throw err;
+			console.log(err)
+			console.log(err)
 		});
 
-		books = books.data;
-		book_categories = book_categories.data;
-		special_book = special_book.data;
-		user_saved_books = user_saved_books.data;
+		books = books?.data || [];
+		book_categories = book_categories?.data || [];
+		special_book = special_book?.data || [];
+		user_saved_books = user_saved_books?.data || [];
 
 		books.forEach((book) => {
 			if (book.is_featured) {
@@ -1495,6 +1499,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 		send200(responseData, res);
 	} catch (error) {
+		console.log(error)
 		send400("error", res);
 	}
 });
