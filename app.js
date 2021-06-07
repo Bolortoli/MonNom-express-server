@@ -196,7 +196,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 });
 
 app.get('/test', async (req, res) => {
-	res.send('test')
+	res.send('test response')
 })
 
 app.post("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
