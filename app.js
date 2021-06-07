@@ -147,6 +147,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 });
 
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
+<<<<<<< HEAD
 	// try {
 	const invoice_id = req.params.invoice_id;
 	let paymentResponse = await axios
@@ -167,11 +168,22 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 			}
 		)
 		.catch((err) => {
+=======
+	try {
+		const invoice_id = req.params.invoice_id;
+		let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
+			throw "Fetching payment failed";
+		});
+		paymentResponse = paymentResponse.data[0];
+
+		let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get" }).catch((err) => {
+>>>>>>> 3efa1b50c52c3e5037303338cc08892934898ec5
 			throw "Paymet update failed";
 		});
 
 	paymentUpdateResponse = paymentUpdateResponse.data;
 
+<<<<<<< HEAD
 	await axios
 		.post(
 			`${STRAPI_URL}/${req.params.payment_collection_name}`,
@@ -187,6 +199,43 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 	// } catch (e) {
 	// 	send400(e, res);
 	// }
+=======
+		await axios.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
+			book: paymentUpdateResponse.book.id,
+			users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
+			payment: paymentUpdateResponse.id,
+		});
+
+		try {
+			///// try to send notification
+			// get user by id
+			console.log('send notification');
+			const { data } = await axios.get(`${STRAPI_URL}/users/${paymentUpdateResponse.users_permissions_user.id}`);
+			// get fcm token
+			const fcmToken = data.fcm_token;
+			// send notification
+			await axios({
+				url: 'https://fcm.googleapis.com/fcm/send',
+				method: 'POST',
+				headers: {
+					Authorization: `key=${process.env.FCM_SERVER_KEY}`
+				},
+				data: {
+					"registration_ids": [fcmToken],
+					"channel_id": "fcm_default_channel",
+					"data": {
+						"book_id": paymentUpdateResponse.book.id,
+					}
+				}
+			});
+		} catch (e) {
+
+		}
+		send200(paymentUpdateResponse, res);
+	} catch (e) {
+		send400(e, res);
+	}
+>>>>>>> 3efa1b50c52c3e5037303338cc08892934898ec5
 });
 
 app.post("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
