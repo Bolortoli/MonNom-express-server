@@ -145,28 +145,6 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 
 // qpay payment callback
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
-<<<<<<< HEAD
-	// try {
-	const invoice_id = req.params.invoice_id;
-	let paymentResponse = await axios
-		.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`, {
-			Authorization: req.headers.authorization,
-		})
-		.catch((err) => {
-			throw "Fetching payment failed";
-		});
-	paymentResponse = paymentResponse.data[0];
-
-	let paymentUpdateResponse = await axios
-		.put(
-			`${STRAPI_URL}/payments/${paymentResponse.id}`,
-			{ is_approved: true, payment_data: JSON.stringify(req.body) + "get" },
-			{
-				Authorization: req.headers.authorization,
-			}
-		)
-		.catch((err) => {
-=======
 	try {
 		const invoice_id = req.params.invoice_id;
 		let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
@@ -175,29 +153,11 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 		paymentResponse = paymentResponse.data[0];
 
 		let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get" }).catch((err) => {
->>>>>>> a1678c47017e720e9aa8f434bb8707692738d81c
 			throw "Paymet update failed";
 		});
 
 		paymentUpdateResponse = paymentUpdateResponse.data;
 
-<<<<<<< HEAD
-	await axios
-		.post(
-			`${STRAPI_URL}/${req.params.payment_collection_name}`,
-			{},
-			{
-				Authorization: req.headers.authorization,
-			}
-		)
-		.catch((err) => {
-			throw "Payment creation failed";
-		});
-	send200(paymentUpdateResponse, res);
-	// } catch (e) {
-	// 	send400(e, res);
-	// }
-=======
 		await axios.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
 			book: paymentUpdateResponse.book.id,
 			users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
@@ -233,7 +193,6 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 	} catch (e) {
 		send400(e, res);
 	}
->>>>>>> a1678c47017e720e9aa8f434bb8707692738d81c
 });
 
 app.post("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
