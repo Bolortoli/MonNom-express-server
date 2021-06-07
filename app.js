@@ -8,20 +8,23 @@ import path, { dirname } from "path";
 import http from "http";
 import fs from "fs";
 import * as client from "twilio";
-import dotenv from 'dotenv';
-dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
-const STRAPI_URL = process.env.STRAPI_URL;
-const STRAPI_URL_IP = process.env.STRAPI_URL_IP;
+const port = 3001;
+
+const STRAPI_URL = "https://strapi.monnom.mn";
+const STRAPI_URL_IP = "https://strapi.monnom.mn";
+
+// For OTP
+const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
+const authToken = "e7b32db7e802e78dadc563311804baf6";
 
 // For payment
-const QPAY_MERCHANT_USERNAME = process.env.QPAY_MERCHANT_USERNAME;
-const QPAY_MERCHANT_PASSWORD = process.env.QPAY_MERCHANT_PASSWORD;
-const QPAY_MERCHANT_INVOICE_NAME = process.env.QPAY_MERCHANT_INVOICE_NAME;
-const QPAY_MERCHANT = process.env.QPAY_MERCHANT;
-const QPAY_MERCHANT_AUTHENTICATION = process.env.QPAY_MERCHANT_AUTHENTICATION;
+const QPAY_MERCHANT_USERNAME = "HAN_AQUA";
+const QPAY_MERCHANT_PASSWORD = "UOaod0R9";
+const QPAY_MERCHANT_INVOICE_NAME = "HANAQUA_INVOICE";
+const QPAY_MERCHANT = "https://merchant.qpay.mn/v2/invoice";
+const QPAY_MERCHANT_AUTHENTICATION = "https://merchant.qpay.mn/v2/auth/token";
 
 // Book payment types
 const PAYMENT_EBOOK_MAGIC_WORD = "ebook";
@@ -110,7 +113,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 					phone: "99887766",
 				},
 				amount: book.online_book_price,
-				callback_url: `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}`,
+				callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}`,
 			},
 		});
 
@@ -143,7 +146,6 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-// qpay payment callback
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
 	try {
 		const invoice_id = req.params.invoice_id;
@@ -167,28 +169,26 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 		try {
 			///// try to send notification
 			// get user by id
-			console.log('send notification');
+			console.log("send notification");
 			const { data } = await axios.get(`${STRAPI_URL}/users/${paymentUpdateResponse.users_permissions_user.id}`);
 			// get fcm token
 			const fcmToken = data.fcm_token;
 			// send notification
 			await axios({
-				url: 'https://fcm.googleapis.com/fcm/send',
-				method: 'POST',
+				url: "https://fcm.googleapis.com/fcm/send",
+				method: "POST",
 				headers: {
-					Authorization: `key=${process.env.FCM_SERVER_KEY}`
+					Authorization: `key=${process.env.FCM_SERVER_KEY}`,
 				},
 				data: {
-					"registration_ids": [fcmToken],
-					"channel_id": "fcm_default_channel",
-					"data": {
-						"book_id": paymentUpdateResponse.book.id,
-					}
-				}
+					registration_ids: [fcmToken],
+					channel_id: "fcm_default_channel",
+					data: {
+						book_id: paymentUpdateResponse.book.id,
+					},
+				},
 			});
-		} catch (e) {
-
-		}
+		} catch (e) {}
 		send200(paymentUpdateResponse, res);
 	} catch (e) {
 		send400(e, res);
@@ -490,8 +490,8 @@ app.get("/book-add-informations", async (req, res) => {
 			throw "error-categpries";
 		});
 
-		sendData.available_categories = authors.data;
-		sendData.available_authors = categories.data;
+		sendData.available_categories = categories.data;
+		sendData.available_authors = authors.data;
 
 		send200(sendData, res);
 	} catch (error) {
@@ -1839,17 +1839,6 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		let is_paid = customer_paid_ebooks != 0;
 
-		let clientPdfPath = null;
-		if (is_paid && book.pdf_book_path?.url) {
-			if (book.pdf_book_path?.url[0] === '/') {
-				// /upload/... ???
-				clientPdfPath = `${STRAPI_URL_IP}${book.pdf_book_path?.url}`;
-			} else {
-				// expects s3 url
-				clientPdfPath = book.pdf_book_path?.url
-			}
-		}
-
 		responseData.book = {
 			id: book.id,
 			picture: `${STRAPI_URL_IP}${book.picture?.url}`,
@@ -1863,17 +1852,17 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			introduction: book.introduction,
 			youtubeIntroLink: book.youtube_intro,
 			is_paid: is_paid,
-			pdfPath: clientPdfPath,
+			pdfPath: is_paid ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
 			audioChapters:
 				is_paid && book.has_audio
 					? book.book_audios?.map((chapter) => {
-						return {
-							id: chapter.id,
-							name: chapter.chapter_name,
-							duration: chapter.audio_duration,
-							number: chapter.number,
-						};
-					})
+							return {
+								id: chapter.id,
+								name: chapter.chapter_name,
+								duration: chapter.audio_duration,
+								number: chapter.number,
+							};
+					  })
 					: null,
 		};
 
