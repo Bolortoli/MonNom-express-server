@@ -10,7 +10,7 @@ import fs from "fs";
 import * as client from "twilio";
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3000;
 
 const STRAPI_URL = "https://strapi.monnom.mn";
 const STRAPI_URL_IP = "https://strapi.monnom.mn";
@@ -188,12 +188,16 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 					},
 				},
 			});
-		} catch (e) {}
+		} catch (e) { }
 		send200(paymentUpdateResponse, res);
 	} catch (e) {
 		send400(e, res);
 	}
 });
+
+app.get('/test', async (req, res) => {
+	res.send('test')
+})
 
 app.post("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
 	try {
@@ -1856,13 +1860,13 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			audioChapters:
 				is_paid && book.has_audio
 					? book.book_audios?.map((chapter) => {
-							return {
-								id: chapter.id,
-								name: chapter.chapter_name,
-								duration: chapter.audio_duration,
-								number: chapter.number,
-							};
-					  })
+						return {
+							id: chapter.id,
+							name: chapter.chapter_name,
+							duration: chapter.audio_duration,
+							number: chapter.number,
+						};
+					})
 					: null,
 		};
 
