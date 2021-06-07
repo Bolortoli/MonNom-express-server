@@ -25,21 +25,25 @@ jobs:
       uses: actions/setup-node@v2
       with:
         node-version: ${{ matrix.node-version }}
+    # clear dotenv
     - run: rm -rf ./.env
       continue-on-error: true
+      
+    # env variables
     - run: echo STRAPI_URL=${{ secrets.STRAPI_URL }} >> .env
     - run: echo STRAPI_URL_IP=${{ secrets.STRAPI_URL_IP }} >> .env
     - run: echo PORT=${{ secrets.PORT }} >> .env
-    
     - run: echo QPAY_MERCHANT_USERNAME=${{ secrets.QPAY_MERCHANT_USERNAME }} >> .env
     - run: echo QPAY_MERCHANT_PASSWORD=${{ secrets.QPAY_MERCHANT_PASSWORD }} >> .env
+    - run: echo QPAY_MERCHANT_INVOICE_NAME=${{ secrets.QPAY_MERCHANT_INVOICE_NAME }} >> .env
+    - run: echo QPAY_MERCHANT=${{ secrets.QPAY_MERCHANT }} >> .env
+    - run: echo QPAY_MERCHANT_AUTHENTICATION=${{ secrets.QPAY_MERCHANT_AUTHENTICATION }} >> .env
+    - run: echo FCM_SERVER_KEY=${{ secrets.FCM_SERVER_KEY }} >> .env
     
-    - run: |
-          touch .env
-          echo API_ENDPOINT="https://xxx.execute-api.us-west-2.amazonaws.com" >> .env
-          echo API_KEY=${{ secrets.API_KEY }} >> .env
-          cat .env
+    # install dependencies
     - run: npm i
+
+    # run app
     - run: pm2 delete monnom-express
       continue-on-error: true
     - run: pm2 start start.sh --name monnom-express
