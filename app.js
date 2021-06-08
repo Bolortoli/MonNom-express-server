@@ -217,7 +217,10 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 					body: '',
 				},
 				data: {
+					title: 'Төлбөр амжилттай',
+					body: '',
 					book_id: paymentUpdateResponse.book.id,
+					type: 'book_payment'
 				},
 			},
 		}).catch((err) => {
