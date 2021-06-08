@@ -1382,7 +1382,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 		if (special_book.book != null)
 			responseData.specialBook = {
 				id: special_book.book?.id,
-				picture: `${special_book.book?.picture?.url}`,
+				picture: `${(special_book.book?.picture?.url || '').startsWith('/') ? `${STRAPI_URL}${special_book.book?.picture?.url}` : special_book.book?.picture?.url}`,
 			};
 
 		send200(responseData, res);
