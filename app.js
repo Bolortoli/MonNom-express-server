@@ -8,6 +8,8 @@ import path, { dirname } from "path";
 import http from "http";
 import fs from "fs";
 import * as client from "twilio";
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -79,14 +81,13 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		}).catch((err) => {
 			throw "QPAY authorization failed";
 		});
-
 		// For get book price
 		let book = await axios({
 			method: "GET",
 			url: `${STRAPI_URL}/books/${req.body.book_id}`,
-			// headers: {
-			// 	Authorization: req.headers.authorization,
-			// },
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`,
+			},
 		}).catch((err) => {
 			throw "Fetch book failed";
 		});
@@ -100,7 +101,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			invoice_receiver_code: req.body.user_id.toString(),
 			invoice_description: `Monnom Audio Book - ${req.body.book_name} төлбөр.`,
 			amount: null,
-			callback_url: `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}`,
+			callback_url: `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}`,
 			// callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
 		};
 
@@ -161,22 +162,35 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token", async (req, res, next) => {
+
 	try {
+
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `Bearer ${req.params.auth_token}`
+			}
+		})
 		const invoice_id = req.params.invoice_id;
-		let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
+		let paymentResponse = await apiClient.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
 			throw "Fetching payment failed";
 		});
 
 		paymentResponse = paymentResponse.data[0];
 
-		let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get" }).catch((err) => {
-			throw "Payment update failed";
-		});
+		let paymentUpdateResponse;
+		try {
+			paymentUpdateResponse = await apiClient.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, {
+				is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get"
+			})
+		} catch (e) {
+			throw 'Payment update failed';
+		}
 
 		paymentUpdateResponse = paymentUpdateResponse.data;
 
-		await axios
+		await apiClient
 			.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
 				book: paymentUpdateResponse.book.id,
 				users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
@@ -186,6 +200,9 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 				throw "Failed to save on collection name";
 			});
 
+		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
+		const user = userResponse.data[0];
+		const fcmToken = user?.fcm_token;
 		await axios({
 			url: "https://fcm.googleapis.com/fcm/send",
 			method: "POST",
@@ -195,15 +212,21 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 			data: {
 				registration_ids: [fcmToken],
 				channel_id: "fcm_default_channel",
+				notification: {
+					title: 'Төлбөр амжилттай',
+					body: '',
+				},
 				data: {
 					book_id: paymentUpdateResponse.book.id,
 				},
 			},
 		}).catch((err) => {
+			console.log(err);
 			throw "Failed to send notification";
 		});
 		send200(paymentUpdateResponse, res);
 	} catch (e) {
+		console.log(e);
 		send400(e, res);
 	}
 });
