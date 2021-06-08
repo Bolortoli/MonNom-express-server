@@ -1762,9 +1762,9 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 		let is_paid_ebook = customer_paid_ebooks.data?.length != 0;
 		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0;
 
-		const absPdfPath = '';
+		let absPdfPath = '';
 		if (is_paid_ebook) {
-			absPdfPath = (book.pdf_book_path?.url || '').startsWith('/') ? (`${STRAPI_URL_IP}${book.pdf_book_path?.url}`) : (book.pdf_book_path?.url);
+			absPdfPath = (book?.pdf_book_path?.url || '').startsWith('/') ? (`${STRAPI_URL_IP}${book.pdf_book_path?.url}`) : (book.pdf_book_path?.url)
 		}
 		responseData.book = {
 			id: book.id,
