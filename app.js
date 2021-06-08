@@ -1784,6 +1784,8 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			picture: `${STRAPI_URL_IP}${book.picture?.url}`,
 			name: book.name,
 			eBookPrice: book.online_book_price,
+			bookPrice: book.book_price,
+			audioBookPrice: book.audio_book_price,
 			salesCount: sales_count,
 			hasAudio: book.has_audio,
 			hasPdf: book.has_pdf,
