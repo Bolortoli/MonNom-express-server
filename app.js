@@ -538,7 +538,7 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 					sendData.user_books = response.data.map((book) => {
 						return {
 							id: book.id,
-							book_pic_url: book.picture?.url,
+							book_pic_url: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 							book_name: book.name,
 							book_author: book.book_authors.map((author) => {
 								return {
@@ -999,7 +999,7 @@ app.get("/all-books-list", async (req, res) => {
 					return {
 						user_id: book.users_permissions_user?.id,
 						id: book.id,
-						book_pic_url: book.picture?.url,
+						book_pic_url: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 						book_author_name: book.book_authors.map((author) => {
 							return author.author_name;
 						}),
@@ -1326,7 +1326,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			if (book.is_featured) {
 				responseData.bestBooks.push({
 					id: book.id,
-					picture_path: `${book.picture?.url}`,
+					picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 				});
 			}
 			if (book.has_audio) {
@@ -1340,7 +1340,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 				responseData.audioBooks.push({
 					id: book.id,
-					picture_path: `${book.picture?.url}`,
+					picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 					authors: tempAuthorsString,
 					name: book.name,
 					is_saved: is_saved != undefined ? true : false,
@@ -1363,7 +1363,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 					return {
 						id: book.id,
-						picture_path: `${book.picture?.url}`,
+						picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 						authors: tempAuthorsString,
 						name: book.name,
 						is_saved: is_saved != undefined ? true : false,
@@ -1555,7 +1555,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			return {
 				id: boughtBook.book.id,
 				name: boughtBook.book.name,
-				picture: `${STRAPI_URL_IP}${boughtBook.book.picture?.url}`,
+				picture: (boughtBook.book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${boughtBook.book.picture?.url}` : boughtBook.book.picture?.url,
 			};
 		});
 
@@ -1563,7 +1563,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			return {
 				id: save.book.id,
 				name: save.book.name,
-				picture: `${STRAPI_URL_IP}${save.book.picture?.url}`,
+				picture: (save.book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${save.book.picture?.url}` : save.book.picture?.url,
 			};
 		});
 
