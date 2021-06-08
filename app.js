@@ -1762,6 +1762,10 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 		let is_paid_ebook = customer_paid_ebooks.data?.length != 0;
 		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0;
 
+		const absPdfPath = '';
+		if (is_paid_ebook) {
+			absPdfPath = (book.pdf_book_path?.url || '').startsWith('/') ? (`${STRAPI_URL_IP}${book.pdf_book_path?.url}`) : (book.pdf_book_path?.url);
+		}
 		responseData.book = {
 			id: book.id,
 			picture: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
@@ -1779,7 +1783,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			is_paid_book,
 			is_paid_ebook,
 			is_paid_audio_book,
-			pdfPath: is_paid_ebook ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
+			pdfPath: absPdfPath,
 			audioChapters:
 				is_paid_audio_book && book.has_audio
 					? book.book_audios?.map((chapter) => {
