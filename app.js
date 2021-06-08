@@ -1764,7 +1764,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		responseData.book = {
 			id: book.id,
-			picture: `${STRAPI_URL_IP}${book.picture?.url}`,
+			picture: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 			name: book.name,
 			eBookPrice: book.online_book_price,
 			bookPrice: book.book_price,
@@ -1813,7 +1813,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 				responseData.relatedBooks.push({
 					id: book.id,
 					name: book.name,
-					picture: `${book.picture?.url}`,
+					picture: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 				});
 		});
 
