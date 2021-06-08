@@ -1031,7 +1031,7 @@ app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.body.channel_id}&users_permissions_user=${req.body.user_id}`,
 			method: "GET",
 			headers: {
-				Authorization: req.headers.authorization,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
