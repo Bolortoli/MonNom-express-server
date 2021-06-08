@@ -16,8 +16,7 @@ const STRAPI_URL = "https://strapi.monnom.mn";
 const STRAPI_URL_IP = "https://strapi.monnom.mn";
 
 // For OTP
-const accountSid = "AC8cb810f12362aa5963b562138c3de4b5";
-const authToken = "e7b32db7e802e78dadc563311804baf6";
+const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
 
 // For payment
 const QPAY_MERCHANT_USERNAME = "HAN_AQUA";
@@ -85,9 +84,9 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		let book = await axios({
 			method: "GET",
 			url: `${STRAPI_URL}/books/${req.body.book_id}`,
-			headers: {
-				Authorization: req.headers.authorization,
-			},
+			// headers: {
+			// 	Authorization: req.headers.authorization,
+			// },
 		}).catch((err) => {
 			throw "Fetch book failed";
 		});
@@ -95,33 +94,49 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		qpay_access = qpay_access.data;
 		book = book.data;
 
+		let data = {
+			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
+			sender_invoice_no: tempInvoiceId,
+			invoice_receiver_code: req.body.user_id.toString(),
+			invoice_description: `Monnom Audio Book - ${req.body.book_name} төлбөр.`,
+			amount: null,
+			callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}`,
+			// callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
+		};
+
+		switch (req.params.payment_type) {
+			case PAYMENT_EBOOK_MAGIC_WORD:
+				data.amount = book.online_book_price;
+				break;
+			case PAYMENT_AUDIO_BOOK_MAGIC_WORD:
+				data.amount = book.audio_book_price;
+				break;
+
+			case PAYMENT_BOOK_MAGIC_WORD:
+				data.amount = book.book_price;
+				break;
+			default:
+				throw "Magic word not founds";
+		}
+
+		console.log(data);
 		let qpay_invoice_creation = await axios({
 			method: "POST",
 			url: QPAY_MERCHANT,
 			headers: {
 				Authorization: `Bearer ${qpay_access.access_token}`,
 			},
-			data: {
-				invoice_code: QPAY_MERCHANT_INVOICE_NAME,
-				sender_invoice_no: tempInvoiceId,
-				invoice_receiver_code: req.body.user_id.toString(),
-				invoice_description: `Monnom Audio Book - ${req.body.book_name} төлбөр.`,
-				invoice_receiver_data: {
-					register: "TA89102712",
-					name: "Бат",
-					email: "www.monnom.mn@gmail.mn",
-					phone: "99887766",
-				},
-				amount: book.online_book_price,
-				callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}`,
-			},
+			data,
+		}).catch((err) => {
+			console.log(err);
+			throw "Invoice creation failed";
 		});
 
 		await axios({
 			method: "POST",
 			url: `${STRAPI_URL}/payments`,
 			headers: {
-				Authorization: req.headers.authorization,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 			data: {
 				users_permissions_user: req.body.user_id,
@@ -152,52 +167,50 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name", async 
 		let paymentResponse = await axios.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
 			throw "Fetching payment failed";
 		});
+
 		paymentResponse = paymentResponse.data[0];
 
 		let paymentUpdateResponse = await axios.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, { is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get" }).catch((err) => {
-			throw "Paymet update failed";
+			throw "Payment update failed";
 		});
 
 		paymentUpdateResponse = paymentUpdateResponse.data;
 
-		await axios.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
-			book: paymentUpdateResponse.book.id,
-			users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
-			payment: paymentUpdateResponse.id,
-		});
-
-		try {
-			///// try to send notification
-			// get user by id
-			console.log("send notification");
-			const { data } = await axios.get(`${STRAPI_URL}/users/${paymentUpdateResponse.users_permissions_user.id}`);
-			// get fcm token
-			const fcmToken = data.fcm_token;
-			// send notification
-			await axios({
-				url: "https://fcm.googleapis.com/fcm/send",
-				method: "POST",
-				headers: {
-					Authorization: `key=${process.env.FCM_SERVER_KEY}`,
-				},
-				data: {
-					registration_ids: [fcmToken],
-					channel_id: "fcm_default_channel",
-					data: {
-						book_id: paymentUpdateResponse.book.id,
-					},
-				},
+		await axios
+			.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
+				book: paymentUpdateResponse.book.id,
+				users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
+				payment: paymentUpdateResponse.id,
+			})
+			.catch((err) => {
+				throw "Failed to save on collection name";
 			});
-		} catch (e) { }
+
+		await axios({
+			url: "https://fcm.googleapis.com/fcm/send",
+			method: "POST",
+			headers: {
+				Authorization: `key=${process.env.FCM_SERVER_KEY}`,
+			},
+			data: {
+				registration_ids: [fcmToken],
+				channel_id: "fcm_default_channel",
+				data: {
+					book_id: paymentUpdateResponse.book.id,
+				},
+			},
+		}).catch((err) => {
+			throw "Failed to send notification";
+		});
 		send200(paymentUpdateResponse, res);
 	} catch (e) {
 		send400(e, res);
 	}
 });
 
-app.get('/test', async (req, res) => {
-	res.send('test workflow')
-})
+app.get("/test", async (req, res) => {
+	res.send("test workflow");
+});
 
 app.post("/payment/payment-callback/:invoice_id/:payment_collection_name", async (req, res, next) => {
 	try {
@@ -506,13 +519,16 @@ app.get("/book-add-informations", async (req, res) => {
 // Information about specific book author all books
 app.get("/book-single-by-author/:id", async (req, res) => {
 	console.log("book single");
+	console.log(req.headers);
 	const headers = {
-		authorization: req.headers.authorization,
+		Authorization: req.headers.authorization,
 	};
 	await axios({
 		url: `${STRAPI_URL}/users/${req.params.id}`,
 		method: "GET",
-		headers: headers,
+		headers: {
+			Authorization: req.headers.authorization,
+		},
 	})
 		.then(async (response) => {
 			// TODO user data
@@ -532,7 +548,7 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 			await axios({
 				method: "GET",
 				url: `${STRAPI_URL}/books?users_permissions_user.id=${req.params.id}`,
-				headers: headers,
+				// headers: headers,
 			})
 				.then(async (response) => {
 					// console.log(response.data);
@@ -571,21 +587,21 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 					await axios({
 						method: "GET",
 						url: `${STRAPI_URL}/book-authors`,
-						headers: headers,
+						// headers: headers,
 					})
 						.then(async (responseAuthors) => {
 							sendData.available_authors = responseAuthors.data;
 							await axios({
 								method: "GET",
 								url: `${STRAPI_URL}/book-categories`,
-								headers: headers,
+								// headers: headers,
 							})
 								.then(async (responseCategories) => {
 									sendData.available_categories = responseCategories.data;
 									await axios({
 										method: "GET",
 										url: `${STRAPI_URL}/customer-paid-books`,
-										headers: headers,
+										// headers: headers,
 									})
 										.then((responsePayments) => {
 											sendData.user_books.forEach((book) => (book.book_sales_count = responsePayments.data.filter((payment) => book.id == payment.book?.id).length));
@@ -597,7 +613,7 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 									await axios({
 										method: "GET",
 										url: `${STRAPI_URL}/customer-paid-ebooks`,
-										headers: headers,
+										// headers: headers,
 									})
 										.then((responsePayments) => {
 											sendData.user_books.forEach((book) => (book.online_book_sales_count = responsePayments.data.filter((payment) => book.id == payment.book?.id).length));
@@ -622,12 +638,9 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 				})
 				.catch((err) => {
 					throw "broken5";
-					// console.log(err);
-					// send400("error", res);
 				});
 		})
 		.catch((err) => {
-			// console.log(err);
 			send400(err, res);
 		});
 
@@ -698,15 +711,9 @@ app.delete("/podcast/:id", async (req, res) => {
 
 // Create podcast episode
 app.post("/podcast", upload.single("podcast_episode"), async (req, res) => {
-	// console.log("asdasd");
-	// res.send(req.body);
 	await axios
-		.post(`${STRAPI_URL}/podcast-episodes`, formData, {
-			Authorization: req.headers.authorization,
-		})
+		.post(`${STRAPI_URL}/podcast-episodes`, formData, { Authorization: req.headers.authorization })
 		.then(async (res) => {
-			console.log("res.data");
-			console.log(res.data);
 			let tempResponse = res.data;
 			let imageData = new FormData();
 
@@ -718,65 +725,37 @@ app.post("/podcast", upload.single("podcast_episode"), async (req, res) => {
 			imageData.append("source", "users-permissions");
 
 			await axios
-				.post("${STRAPI_URL}/upload", imageData, {
-					Authorization: req.headers.authorization,
-				})
+				.post("${STRAPI_URL}/upload", imageData, { Authorization: req.headers.authorization })
 				.then((res) => {
 					tempResponse.profile_picture = res.data[0];
-					SetIsNetworkLoading(false);
 				})
 				.catch((err) => {
-					SetIsNetworkError(true);
+					send400("");
 				});
-			console.log(tempResponse);
-			initializeUsersList([tempResponse]);
 		})
 		.catch((err) => {
-			SetIsNetworkError(true);
+			send400("error", res);
 		});
 });
 
 // Create admin
 app.post("/create-admin", upload.single("profile_picture"), async (req, res, next) => {
-	console.log("body");
-	console.log(req.body);
-	try {
-		// console.log("------------AUTHORIZATION HEADER ------------");
-		// console.log(req.headers.authorization);
-		await axios({
-			url: `${STRAPI_URL}/users`,
-			method: "POST",
-			headers: {
-				"content-type": "multipart/form-data",
-				Authorization: req.headers.authorization,
-			},
-			body: {
-				username: req.body.username,
-				password: req.body.password,
-				role: 1,
-				phone: req.body.phone,
-				gender: req.body.gender,
-				fullname: req.body.fullname,
-				user_role: req.body.user_role,
-				e_mail: req.body.emailof,
-				email: req.body.emailof,
-			},
+	await axios({
+		url: `${STRAPI_URL}/users`,
+		method: "POST",
+		headers: { "content-type": "multipart/form-data", Authorization: req.headers.authorization },
+		body: { username: req.body.username, password: req.body.password, role: 1, phone: req.body.phone, gender: req.body.gender, fullname: req.body.fullname, user_role: req.body.user_role, e_mail: req.body.emailof, email: req.body.emailof },
+	})
+		.then((response) => {
+			send200(response.data, res);
 		})
-			.then((response) => {
-				send200(response.data, res);
-			})
-			.catch((err) => {
-				send400(err.response.data, res);
-			});
-	} catch (err) {
-		next(err);
-	}
+		.catch((err) => {
+			send400(err.response.data, res);
+		});
 });
 
 // Update terms and conditions
 app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, res) => {
-	console.log("body");
-	console.log(req.body.terms);
 	await axios({
 		url: `${STRAPI_URL}/settings`,
 		method: "PUT",
@@ -801,16 +780,7 @@ app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, r
 app.post("/admin-login", async (req, res) => {
 	console.log(req.body);
 	await axios
-		.post(
-			`${STRAPI_URL}/auth/local`,
-			{
-				identifier: req.body.identifier,
-				password: req.body.password,
-			},
-			{
-				Authorization: req.headers.authorization,
-			}
-		)
+		.post(`${STRAPI_URL}/auth/local`, { identifier: req.body.identifier, password: req.body.password }, { Authorization: req.headers.authorization })
 		.then((response) => {
 			send200(response.data, res);
 		})
@@ -1117,7 +1087,15 @@ app.post("/app/unsave-book", async (req, res, next) => {
 		});
 
 		console.log(saves);
-		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, {})));
+		const [resp] = await Promise.all(
+			saves.map((podcastRequest) =>
+				axios.delete(podcastRequest, {
+					headers: {
+						Authorization: req.headers.authorization,
+					},
+				})
+			)
+		);
 		send200({}, res);
 	} catch (error) {
 		send400("error", res);
@@ -1126,35 +1104,38 @@ app.post("/app/unsave-book", async (req, res, next) => {
 
 // all channels list
 app.get("/app/live", async (req, res, next) => {
-	try {
-		let responseData = {
-			channelsList: [],
-		};
+	// try {
+	console.log(req.headers);
+	let responseData = {
+		channelsList: [],
+	};
 
-		let channel = await axios({
-			url: `${STRAPI_URL}/radio-channels`,
-			method: "GET",
-			headers: {
-				Authorization: req.headers.authorization,
-			},
-		}).catch((err) => {
-			throw "error fetch data";
-		});
+	let channel = await axios({
+		url: `${STRAPI_URL}/radio-channels`,
+		method: "GET",
+		// headers: {
+		// 	Authorization: `Bearer ${req.headers.authorization}`,
+		// },
+	}).catch((err) => {
+		console.log(err);
+		throw "error fetch data";
+	});
 
-		channel = channel.data;
+	channel = channel.data;
 
-		channel.forEach((c) => {
-			if (c.is_active)
-				responseData.channelsList.push({
-					id: c.id,
-					name: c.name,
-				});
-		});
+	channel.forEach((c) => {
+		console.log(c);
+		if (c.is_active && c.radio_channel_audios.length != 0)
+			responseData.channelsList.push({
+				id: c.id,
+				name: c.name,
+			});
+	});
 
-		send200(responseData, res);
-	} catch (error) {
-		send400(error, res);
-	}
+	send200(responseData, res);
+	// } catch (error) {
+	// 	send400(error, res);
+	// }
 });
 
 // Radio channel single
@@ -1169,11 +1150,12 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 		let channel = await axios({
 			url: `${STRAPI_URL}/radio-channels/${req.params.channel_id}`,
 			method: "GET",
-			headers: {
-				Authorization: req.headers.authorization,
-			},
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
 		}).catch((err) => {
-			throw "error saved books";
+			console.log(err);
+			throw "failed to fetch radio channel";
 		});
 
 		channel = channel.data;
@@ -1208,7 +1190,7 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 		responseData.episodes = channel_audio.map((episode) => {
 			return {
 				id: episode.id,
-				mp3_file_path: `${STRAPI_URL_IP}${episode.audio?.url}`,
+				mp3_file_path: `${episode.audio?.url}`,
 				duration: episode.audio_duration,
 			};
 		});
@@ -1219,121 +1201,47 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 	}
 });
 
-// Check if phone number can be username, then create confirmation code
+// Check if phone number can be username, then create confirmation code and send sms
 app.post("/create-confirmation-code", async (req, res) => {
-	console.log("cofirmation");
 	try {
 		let confirmationCode = create_temp_unique_text("xxxxxx");
+		let users = await axios({
+			url: `${STRAPI_URL}/users?username=${req.body.phone}`,
+			method: "GET",
+		}).catch((err) => {
+			throw "failed to filter users";
+		});
 
-		let tempUniqueText = create_temp_unique_text("xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx");
-		axios({
-			url: `${STRAPI_URL}/users`,
-			method: "POST",
-			data: {
-				username: `${req.body.phone}`,
-				password: tempUniqueText,
-				email: `${tempUniqueText}@${tempUniqueText}.${tempUniqueText}`,
-			},
-		})
-			.then((response) => {
-				axios
-					.post(`${STRAPI_URL}/auth/local`, {
-						identifier: req.body.phone,
-						password: tempUniqueText,
-					})
-					.then((response) => {
-						axios({
-							url: `${STRAPI_URL}/users/${response.data.user.id}`,
-							method: "DELETE",
-							headers: {
-								Authorization: `Bearer ${response.data.jwt}`,
-							},
-						})
-							.then((response) => {
-								//anhaa
-								//const Client = client("AC8cb810f12362aa5963b562138c3de4b5", "e7b32db7e802e78dadc563311804baf6");
-								// require("twilio")("AC8cb810f12362aa5963b562138c3de4b5", "c540e739b0a9177be35483086b1b73a2")
-								// 	.messages.create({
-								// 		body: "Monnom App баталгаажуулах код: <#>" + confirmationCode,
-								// 		from: "+15614139965",
-								// 		to: "+97680085517",
-								// 	})
-								// 	.then((message) => console.log(message.sid))
-								// 	.catch((e) => console.log(e));
-								// .catch((e) => {
-								// 	throw "error";
-								// });
-								// console.log(cl);
-								send200({ confirmationCode, phone: req.body.phone }, res);
-							})
-							.catch((err) => {
-								throw "error";
-							});
-					})
-					.catch((err) => {
-						throw "error";
-					});
-			})
-			.catch((err) => {
-				throw "error";
-			});
+		if (users.data.length != 0) throw "Phone exists";
+
+		await axios({
+			url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${req.body.phone}&message=Mon Nom confirmation code:%20 ${confirmationCode}`,
+			method: "GET",
+		}).catch((err) => {
+			throw "Failed to send message";
+		});
+
+		send200({ confirmationCode, phone: req.body.phone }, res);
 	} catch (error) {
 		send400("error", res);
 	}
 });
 
 app.post("/app/check-email", async (req, res) => {
-	// TODO create message service
-	let tempUniqueText = "xxxxxx-xxxxxxxxxxx-xxxxxxxxx-xxxxxx".replace(/[xy]/g, function (c) {
-		var r = (Math.random() * 16) | 0,
-			v = c == "x" ? r : (r & 0x3) | 0x8;
-		return v.toString(16).toUpperCase();
-	});
-	axios({
-		url: `${STRAPI_URL}/users`,
-		method: "POST",
-		data: {
-			username: tempUniqueText,
-			password: tempUniqueText,
-			email: req.body.email,
-		},
-	})
-		.then((response) => {
-			axios
-				.post(
-					`${STRAPI_URL}/auth/local`,
-					{
-						identifier: tempUniqueText,
-						password: tempUniqueText,
-					},
-					{
-						headers: {
-							Authorization: `Bearer ${response.data.jwt}`,
-						},
-					}
-				)
-				.then((response) => {
-					axios({
-						url: `${STRAPI_URL}/users/${response.data.user.id}`,
-						method: "DELETE",
-						headers: {
-							Authorization: `Bearer ${response.data.jwt}`,
-						},
-					})
-						.then((response) => {
-							send200({}, res);
-						})
-						.catch((err) => {
-							throw "error";
-						});
-				})
-				.catch((err) => {
-					throw "error";
-				});
-		})
-		.catch((err) => {
-			send400("error", res);
+	try {
+		let users = await axios({
+			url: `${STRAPI_URL}/users?email=${req.body.email}`,
+			method: "GET",
+		}).catch((err) => {
+			throw "failed to filter users";
 		});
+
+		if (users.data.length != 0) throw "Email exists";
+
+		send200({}, res);
+	} catch (error) {
+		send400(error, res);
+	}
 });
 
 // Create customer
@@ -1375,13 +1283,6 @@ app.post("/app/create-user", async (req, res) => {
 
 //
 app.get("/app/books/main/:user_id", async (req, res) => {
-	console.log('headers:')
-	console.log(req.headers)
-	console.log('authorization:')
-	console.log(req.headers.authorization);
-	if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-		req.headers.authorization = req.headers.authorization.split(' ')[1]
-	}
 	try {
 		let responseData = {
 			bestBooks: [],
@@ -1398,7 +1299,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			},
 		}).catch((err) => {
 			// console.log(err);
-			console.log(err)
+			console.log(err);
 		});
 
 		let book_categories = await axios({
@@ -1408,7 +1309,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			console.log(err)
+			console.log(err);
 		});
 
 		let user_saved_books = await axios({
@@ -1418,8 +1319,8 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			console.log(err)
-			console.log(err)
+			console.log(err);
+			console.log(err);
 		});
 
 		let special_book = await axios({
@@ -1429,8 +1330,8 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			console.log(err)
-			console.log(err)
+			console.log(err);
+			console.log(err);
 		});
 
 		books = books?.data || [];
@@ -1442,7 +1343,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			if (book.is_featured) {
 				responseData.bestBooks.push({
 					id: book.id,
-					picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
+					picture_path: `${book.picture?.url}`,
 				});
 			}
 			if (book.has_audio) {
@@ -1456,7 +1357,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 				responseData.audioBooks.push({
 					id: book.id,
-					picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
+					picture_path: `${book.picture?.url}`,
 					authors: tempAuthorsString,
 					name: book.name,
 					is_saved: is_saved != undefined ? true : false,
@@ -1479,7 +1380,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 					return {
 						id: book.id,
-						picture_path: `${STRAPI_URL_IP}${book.picture?.url}`,
+						picture_path: `${book.picture?.url}`,
 						authors: tempAuthorsString,
 						name: book.name,
 						is_saved: is_saved != undefined ? true : false,
@@ -1498,12 +1399,12 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 		if (special_book.book != null)
 			responseData.specialBook = {
 				id: special_book.book?.id,
-				picture: `${STRAPI_URL_IP}${special_book.book?.picture?.url}`,
+				picture: `${special_book.book?.picture?.url}`,
 			};
 
 		send200(responseData, res);
 	} catch (error) {
-		console.log(error)
+		console.log(error);
 		send400("error", res);
 	}
 });
@@ -1520,9 +1421,9 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 		let podcast_channels = await axios({
 			url: `${STRAPI_URL}/podcast-channels`,
 			method: "GET",
-			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
-			},
+			// headers: {
+			// 	Authorization: `Bearer ${req.headers.authorization}`,
+			// },
 		}).catch((err) => {
 			throw "error1";
 		});
@@ -1690,6 +1591,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 });
 
 app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
+	// console.log(req.headers);
 	try {
 		let responseData = {
 			chapters: [],
@@ -1713,9 +1615,10 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 				duration: book.audio_duration,
 				chapter_name: book.chapter_name,
 				chapter_number: book.number,
-				audioFile: `${STRAPI_URL_IP}${book.mp3_file?.url}`,
+				audioFile: `${book.mp3_file?.url}`,
 			};
 		});
+		// console.log(responseData);
 		send200({ responseData }, res);
 	} catch (error) {
 		send400(error, res);
@@ -1730,14 +1633,16 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 			comments: [],
 		};
 
-		let saved_count = await axios({
+		console.log(req.headers);
+
+		let saved_podcasts = await axios({
 			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.params.channel_id}`,
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			throw "error";
+			throw "Failed to fetch user saved podcasts";
 		});
 
 		let channel = await axios({
@@ -1747,18 +1652,20 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
-			throw "error";
+			throw "Failed to fetch podcast channel";
 		});
 
-		saved_count = saved_count.data.length;
+		saved_podcasts = saved_podcasts.data;
 		channel = channel.data;
+		let is_saved = saved_podcasts.filter((podcast) => podcast.users_permissions_user.id == req.params.user_id).length != 0;
 
 		responseData.channel = {
 			id: channel.id,
 			name: channel.name,
 			description: channel.description,
 			picture: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
-			followers: saved_count,
+			followers: saved_podcasts.length,
+			is_saved,
 		};
 
 		responseData.episodes = channel.podcast_episodes
@@ -1790,8 +1697,7 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 });
 
 app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
-	console.log("book single app");
-	console.log(req.params.book_id);
+	console.log(req.headers);
 	try {
 		let responseData = {
 			book: {},
@@ -1804,7 +1710,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			url: `${STRAPI_URL}/books/${req.params.book_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1869,13 +1775,13 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			audioChapters:
 				is_paid && book.has_audio
 					? book.book_audios?.map((chapter) => {
-						return {
-							id: chapter.id,
-							name: chapter.chapter_name,
-							duration: chapter.audio_duration,
-							number: chapter.number,
-						};
-					})
+							return {
+								id: chapter.id,
+								name: chapter.chapter_name,
+								duration: chapter.audio_duration,
+								number: chapter.number,
+							};
+					  })
 					: null,
 		};
 
@@ -1899,7 +1805,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 				responseData.relatedBooks.push({
 					id: book.id,
 					name: book.name,
-					picture: `${STRAPI_URL_IP}${book.picture?.url}`,
+					picture: `${book.picture?.url}`,
 				});
 		});
 
@@ -1923,7 +1829,7 @@ app.get(`/app/search/book/audio/:search`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1964,7 +1870,7 @@ app.get(`/app/search/book/audio`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -2005,7 +1911,7 @@ app.get(`/app/search/book/:search`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -2046,7 +1952,7 @@ app.get(`/app/search/book`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -2084,7 +1990,7 @@ app.get(`/app/search/podcast`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-channels`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -2116,7 +2022,7 @@ app.get(`/app/search/podcast/:search`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-channels`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
