@@ -1375,6 +1375,10 @@ app.post("/app/create-user", async (req, res) => {
 
 //
 app.get("/app/books/main/:user_id", async (req, res) => {
+	console.log('headers:')
+	console.log(req.headers)
+	console.log('authorization:')
+	console.log(req.headers.authorization);
 	if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
 		req.headers.authorization = req.headers.authorization.split(' ')[1]
 	}
