@@ -1598,7 +1598,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 				duration: book.audio_duration,
 				chapter_name: book.chapter_name,
 				chapter_number: book.number,
-				audioFile: `${book.mp3_file?.url}`,
+				audioFile: (book.mp3_file?.url || '').startsWith('/') ? `${STRAPI_URL}${book.mp3_file?.url}` : book.mp3_file?.url,
 			};
 		});
 		// console.log(responseData);
