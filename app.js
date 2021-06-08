@@ -1736,6 +1736,26 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			throw "error2";
 		});
 
+		let customer_paid_books = await axios({
+			url: `${STRAPI_URL}/customer-paid-books?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`,
+			method: "GET",
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`,
+			},
+		}).catch((err) => {
+			throw "error3";
+		});
+
+		let customer_paid_audio_books = await axios({
+			url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`,
+			method: "GET",
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`,
+			},
+		}).catch((err) => {
+			throw "error3";
+		});
+
 		let authorRequests = book.data.book_authors.map((author) => {
 			return `${STRAPI_URL}/books?book_authors_in=${author.id}`;
 		});
@@ -1748,7 +1768,6 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		book = book.data;
 		sales_count = sales_count.data.length;
-		customer_paid_ebooks = customer_paid_ebooks.data;
 
 		let tempAuthorsString = "";
 		book.book_authors.forEach((author, index) => {
@@ -1756,7 +1775,9 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			else tempAuthorsString += `${author.author_name}  `;
 		});
 
-		let is_paid = customer_paid_ebooks != 0;
+		let is_paid_book = customer_paid_books.data?.length != 0;
+		let is_paid_ebook = customer_paid_ebooks.data?.length != 0;
+		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0;
 
 		responseData.book = {
 			id: book.id,
@@ -1770,18 +1791,20 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			authors: tempAuthorsString,
 			introduction: book.introduction,
 			youtubeIntroLink: book.youtube_intro,
-			is_paid: is_paid,
-			pdfPath: is_paid ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
+			is_paid_book,
+			is_paid_ebook,
+			is_paid_audio_book,
+			pdfPath: is_paid_ebook ? (book.pdf_book_path?.url != undefined ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : null) : null,
 			audioChapters:
-				is_paid && book.has_audio
+				is_paid_audio_book && book.has_audio
 					? book.book_audios?.map((chapter) => {
-							return {
-								id: chapter.id,
-								name: chapter.chapter_name,
-								duration: chapter.audio_duration,
-								number: chapter.number,
-							};
-					  })
+						return {
+							id: chapter.id,
+							name: chapter.chapter_name,
+							duration: chapter.audio_duration,
+							number: chapter.number,
+						};
+					})
 					: null,
 		};
 
