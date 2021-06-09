@@ -1062,7 +1062,7 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.body.user_id}&book.id=${req.body.book_id}`,
 			method: "GET",
 			headers: {
-				Authorization: req.headers.authorization,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1078,7 +1078,7 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			saves.map((podcastRequest) =>
 				axios.delete(podcastRequest, {
 					headers: {
-						Authorization: req.headers.authorization,
+						Authorization: `Bearer ${req.headers.authorization}`,
 					},
 				})
 			)
