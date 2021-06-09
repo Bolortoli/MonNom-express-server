@@ -8,7 +8,7 @@ import path, { dirname } from "path";
 import http from "http";
 import fs from "fs";
 import * as client from "twilio";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
@@ -163,15 +163,13 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 });
 
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token", async (req, res, next) => {
-
 	try {
-
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
-				Authorization: `Bearer ${req.params.auth_token}`
-			}
-		})
+				Authorization: `Bearer ${req.params.auth_token}`,
+			},
+		});
 		const invoice_id = req.params.invoice_id;
 		let paymentResponse = await apiClient.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
 			throw "Fetching payment failed";
@@ -182,10 +180,11 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 		let paymentUpdateResponse;
 		try {
 			paymentUpdateResponse = await apiClient.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, {
-				is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get"
-			})
+				is_approved: true,
+				payment_data: JSON.stringify(req.body || {}) + "get",
+			});
 		} catch (e) {
-			throw 'Payment update failed';
+			throw "Payment update failed";
 		}
 
 		paymentUpdateResponse = paymentUpdateResponse.data;
@@ -213,14 +212,14 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 				registration_ids: [fcmToken],
 				channel_id: "fcm_default_channel",
 				notification: {
-					title: 'Төлбөр амжилттай',
-					body: '',
+					title: "Төлбөр амжилттай",
+					body: "",
 				},
 				data: {
-					title: 'Төлбөр амжилттай',
-					body: '',
+					title: "Төлбөр амжилттай",
+					body: "",
 					book_id: paymentUpdateResponse.book.id,
-					type: 'book_payment'
+					type: "book_payment",
 				},
 			},
 		}).catch((err) => {
@@ -531,14 +530,14 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 			await axios({
 				method: "GET",
 				url: `${STRAPI_URL}/books?users_permissions_user.id=${req.params.id}`,
-				// headers: headers,
+				headers: headers,
 			})
 				.then(async (response) => {
 					// console.log(response.data);
 					sendData.user_books = response.data.map((book) => {
 						return {
 							id: book.id,
-							book_pic_url: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+							book_pic_url: (book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 							book_name: book.name,
 							book_author: book.book_authors.map((author) => {
 								return {
@@ -570,21 +569,21 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 					await axios({
 						method: "GET",
 						url: `${STRAPI_URL}/book-authors`,
-						// headers: headers,
+						headers: headers,
 					})
 						.then(async (responseAuthors) => {
 							sendData.available_authors = responseAuthors.data;
 							await axios({
 								method: "GET",
 								url: `${STRAPI_URL}/book-categories`,
-								// headers: headers,
+								headers: headers,
 							})
 								.then(async (responseCategories) => {
 									sendData.available_categories = responseCategories.data;
 									await axios({
 										method: "GET",
 										url: `${STRAPI_URL}/customer-paid-books`,
-										// headers: headers,
+										headers: headers,
 									})
 										.then((responsePayments) => {
 											sendData.user_books.forEach((book) => (book.book_sales_count = responsePayments.data.filter((payment) => book.id == payment.book?.id).length));
@@ -596,7 +595,7 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 									await axios({
 										method: "GET",
 										url: `${STRAPI_URL}/customer-paid-ebooks`,
-										// headers: headers,
+										headers: headers,
 									})
 										.then((responsePayments) => {
 											sendData.user_books.forEach((book) => (book.online_book_sales_count = responsePayments.data.filter((payment) => book.id == payment.book?.id).length));
@@ -663,10 +662,6 @@ app.get("/podcast-channels/:id", async (req, res) => {
 					};
 				}),
 			};
-			// let sendData = response.data.filter(
-			// 	(data) =>
-			// 		data.user_role == 1 || data.user_role == 2 || data.user_role == 3
-			// );
 			res.send(sendData);
 		})
 		.catch((err) => {
@@ -778,7 +773,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/settings`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -788,7 +783,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/podcast-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -798,7 +793,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error2";
@@ -808,7 +803,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-authors`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
@@ -850,13 +845,7 @@ app.get("/settings-page", async (req, res) => {
 // List of employees
 app.get("/all-admins-list", async (req, res) => {
 	// console.log(req);
-	await axios({
-		url: `${STRAPI_URL}/users`,
-		method: "GET",
-		headers: {
-			Authorization: req.headers.authorization,
-		},
-	})
+	await axios({ url: `${STRAPI_URL}/users`, method: "GET", headers: { Authorization: req.headers.authorization } })
 		.then((response) => {
 			let sendData = response.data.filter((data) => data.user_role == 1 || data.user_role == 2 || data.user_role == 3 || data.user_role == 4 || data.user_role == 5);
 			send200(sendData, res);
@@ -870,13 +859,7 @@ app.get("/all-admins-list", async (req, res) => {
 // List of employees who are don't have podcast channel
 app.get("/all-admins-settings", async (req, res) => {
 	// console.log(req);
-	await axios({
-		url: `${STRAPI_URL}/users?podcast_channel_null=true`,
-		method: "GET",
-		headers: {
-			Authorization: req.headers.authorization,
-		},
-	})
+	await axios({ url: `${STRAPI_URL}/users?podcast_channel_null=true`, method: "GET", headers: { Authorization: req.headers.authorization } })
 		.then((response) => {
 			let sendData = response.data.filter((data) => data.user_role == 1 || data.user_role == 2 || data.user_role == 3 || data.user_role == 4 || data.user_role == 5);
 			send200(sendData, res);
@@ -999,7 +982,7 @@ app.get("/all-books-list", async (req, res) => {
 					return {
 						user_id: book.users_permissions_user?.id,
 						id: book.id,
-						book_pic_url: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+						book_pic_url: (book.picture?.url || "").startsWith("/") ? `${book.picture?.url}` : book.picture?.url,
 						book_author_name: book.book_authors.map((author) => {
 							return author.author_name;
 						}),
@@ -1326,7 +1309,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			if (book.is_featured) {
 				responseData.bestBooks.push({
 					id: book.id,
-					picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+					picture_path: (book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 				});
 			}
 			if (book.has_audio) {
@@ -1340,7 +1323,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 				responseData.audioBooks.push({
 					id: book.id,
-					picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+					picture_path: (book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 					authors: tempAuthorsString,
 					name: book.name,
 					is_saved: is_saved != undefined ? true : false,
@@ -1363,7 +1346,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 					return {
 						id: book.id,
-						picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+						picture_path: (book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 						authors: tempAuthorsString,
 						name: book.name,
 						is_saved: is_saved != undefined ? true : false,
@@ -1382,7 +1365,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 		if (special_book.book != null)
 			responseData.specialBook = {
 				id: special_book.book?.id,
-				picture: `${(special_book.book?.picture?.url || '').startsWith('/') ? `${STRAPI_URL}${special_book.book?.picture?.url}` : special_book.book?.picture?.url}`,
+				picture: `${(special_book.book?.picture?.url || "").startsWith("/") ? `${STRAPI_URL}${special_book.book?.picture?.url}` : special_book.book?.picture?.url}`,
 			};
 
 		send200(responseData, res);
@@ -1555,7 +1538,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			return {
 				id: boughtBook.book.id,
 				name: boughtBook.book.name,
-				picture: (boughtBook.book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${boughtBook.book.picture?.url}` : boughtBook.book.picture?.url,
+				picture: (boughtBook.book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${boughtBook.book.picture?.url}` : boughtBook.book.picture?.url,
 			};
 		});
 
@@ -1563,7 +1546,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			return {
 				id: save.book.id,
 				name: save.book.name,
-				picture: (save.book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${save.book.picture?.url}` : save.book.picture?.url,
+				picture: (save.book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${save.book.picture?.url}` : save.book.picture?.url,
 			};
 		});
 
@@ -1598,7 +1581,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 				duration: book.audio_duration,
 				chapter_name: book.chapter_name,
 				chapter_number: book.number,
-				audioFile: (book.mp3_file?.url || '').startsWith('/') ? `${STRAPI_URL}${book.mp3_file?.url}` : book.mp3_file?.url,
+				audioFile: (book.mp3_file?.url || "").startsWith("/") ? `${STRAPI_URL}${book.mp3_file?.url}` : book.mp3_file?.url,
 			};
 		});
 		// console.log(responseData);
@@ -1762,13 +1745,13 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 		let is_paid_ebook = customer_paid_ebooks.data?.length != 0;
 		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0;
 
-		let absPdfPath = '';
+		let absPdfPath = "";
 		if (is_paid_ebook) {
-			absPdfPath = (book?.pdf_book_path?.url || '').startsWith('/') ? (`${STRAPI_URL_IP}${book.pdf_book_path?.url}`) : (book.pdf_book_path?.url)
+			absPdfPath = (book?.pdf_book_path?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${book.pdf_book_path?.url}` : book.pdf_book_path?.url;
 		}
 		responseData.book = {
 			id: book.id,
-			picture: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+			picture: (book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 			name: book.name,
 			eBookPrice: book.online_book_price,
 			bookPrice: book.book_price,
@@ -1787,13 +1770,13 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			audioChapters:
 				is_paid_audio_book && book.has_audio
 					? book.book_audios?.map((chapter) => {
-						return {
-							id: chapter.id,
-							name: chapter.chapter_name,
-							duration: chapter.audio_duration,
-							number: chapter.number,
-						};
-					})
+							return {
+								id: chapter.id,
+								name: chapter.chapter_name,
+								duration: chapter.audio_duration,
+								number: chapter.number,
+							};
+					  })
 					: null,
 		};
 
@@ -1817,7 +1800,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 				responseData.relatedBooks.push({
 					id: book.id,
 					name: book.name,
-					picture: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+					picture: (book.picture?.url || "").startsWith("/") ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
 				});
 		});
 
