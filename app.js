@@ -96,6 +96,28 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			throw "Fetch book failed";
 		});
 
+		// create delivery
+		let order;
+		if (req.body.order_destination?.length) {
+			try {
+				const orderCreateResponse = await axios({
+					method: "POST",
+					url: `${STRAPI_URL}/delivery-registrations`,
+					data: {
+						order_destination: req.body.order_destination,
+						customer: req.body.user_id
+					},
+					headers: {
+						Authorization: `Bearer ${req.headers.authorization}`,
+					},
+				});
+				order = orderCreateResponse.data;
+			} catch (e) {
+				console.log('order create failed');
+				console.log(e);
+			}
+		}
+
 		qpay_access = qpay_access.data;
 		book = book.data;
 
@@ -105,7 +127,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			invoice_receiver_code: req.body.user_id.toString(),
 			invoice_description: `Monnom Audio Book - ${req.body.book_name} төлбөр.`,
 			amount: null,
-			callback_url: `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}`,
+			callback_url: `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order?.id}`,
 			// callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
 		};
 
@@ -137,7 +159,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			throw "Invoice creation failed";
 		});
 
-		await axios({
+		const paymentCreateResponse = await axios({
 			method: "POST",
 			url: `${STRAPI_URL}/payments`,
 			headers: {
@@ -154,6 +176,22 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		}).catch(() => {
 			throw "Save payment failed";
 		});
+		const payment = paymentCreateResponse.data;
+
+		// if (req.params.payment_type === 'book') {
+		// 	const deliveryCreateResponse = await axios({
+		// 		url: `${STRAPI_URL}/delivery-registration`,
+		// 		method: 'POST',
+		// 		data: {
+		// 			order_destination: req.body.order_destination,
+		// 			customer_paid_book: req.body.payment.id,
+		// 			customer: req.body.user_id,
+		// 		},
+		// 		headers: {
+		// 			Authorization: `Bearer ${req.headers.authorization}`
+		// 		}
+		// 	});
+		// }
 
 		// hide invoice_id from client so that they can't hack it
 		let response_data = { ...qpay_invoice_creation.data };
@@ -166,10 +204,9 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_id?", async (req, res, next) => {
 
 	try {
-
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
@@ -177,7 +214,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			}
 		})
 		const invoice_id = req.params.invoice_id;
-		let paymentResponse = await apiClient.get(`${STRAPI_URL}/payments?invoice_id=${invoice_id}`).catch((err) => {
+		let paymentResponse = await apiClient.get(`/payments?invoice_id=${invoice_id}`).catch((err) => {
 			throw "Fetching payment failed";
 		});
 
@@ -185,7 +222,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 
 		let paymentUpdateResponse;
 		try {
-			paymentUpdateResponse = await apiClient.put(`${STRAPI_URL}/payments/${paymentResponse.id}`, {
+			paymentUpdateResponse = await apiClient.put(`/payments/${paymentResponse.id}`, {
 				is_approved: true, payment_data: JSON.stringify(req.body || {}) + "get"
 			})
 		} catch (e) {
@@ -194,8 +231,8 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 
 		paymentUpdateResponse = paymentUpdateResponse.data;
 
-		await apiClient
-			.post(`${STRAPI_URL}/${req.params.payment_collection_name}`, {
+		const bookPaymentResponse = await apiClient
+			.post(`/${req.params.payment_collection_name}`, {
 				book: paymentUpdateResponse.book.id,
 				users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
 				payment: paymentUpdateResponse.id,
@@ -203,6 +240,11 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			.catch((err) => {
 				throw "Failed to save on collection name";
 			});
+
+		// mark delivery payment
+		if (req.params.delivery_id) {
+			apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, { customer_paid_book: bookPaymentResponse.data.id });
+		}
 
 		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
 		const user = userResponse.data[0];
