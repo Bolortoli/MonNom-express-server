@@ -1133,9 +1133,9 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 		let channel = await axios({
 			url: `${STRAPI_URL}/radio-channels/${req.params.channel_id}`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: `Bearer ${req.headers.authorization}`,
-			// },
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`,
+			},
 		}).catch((err) => {
 			console.log(err);
 			throw "failed to fetch radio channel";
@@ -1404,9 +1404,9 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 		let podcast_channels = await axios({
 			url: `${STRAPI_URL}/podcast-channels`,
 			method: "GET",
-			// headers: {
-			// 	Authorization: `Bearer ${req.headers.authorization}`,
-			// },
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`,
+			},
 		}).catch((err) => {
 			throw "error1";
 		});
