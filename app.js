@@ -49,6 +49,10 @@ const upload = multer({ storage: fileStorageEngine });
 
 // ----------------------------- PAYEMNT APIs -----------------------------
 
+const resolveURL = (url) => {
+	return (url || '').startsWith('/') ? `${STRAPI_URL}${url}` : url;
+}
+
 app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	try {
 		let model_name;
@@ -538,7 +542,7 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 					sendData.user_books = response.data.map((book) => {
 						return {
 							id: book.id,
-							book_pic_url: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+							book_pic_url: resolveURL(book.picture?.url),
 							book_name: book.name,
 							book_author: book.book_authors.map((author) => {
 								return {
@@ -999,7 +1003,7 @@ app.get("/all-books-list", async (req, res) => {
 					return {
 						user_id: book.users_permissions_user?.id,
 						id: book.id,
-						book_pic_url: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+						book_pic_url: resolveURL(book.picture?.url),
 						book_author_name: book.book_authors.map((author) => {
 							return author.author_name;
 						}),
@@ -1326,7 +1330,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			if (book.is_featured) {
 				responseData.bestBooks.push({
 					id: book.id,
-					picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+					picture_path: resolveURL(book.picture?.url),
 				});
 			}
 			if (book.has_audio) {
@@ -1340,7 +1344,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 				responseData.audioBooks.push({
 					id: book.id,
-					picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+					picture_path: resolveURL(book.picture?.url),
 					authors: tempAuthorsString,
 					name: book.name,
 					is_saved: is_saved != undefined ? true : false,
@@ -1363,7 +1367,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 					return {
 						id: book.id,
-						picture_path: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+						picture_path: resolveURL(book.picture?.url),
 						authors: tempAuthorsString,
 						name: book.name,
 						is_saved: is_saved != undefined ? true : false,
@@ -1382,7 +1386,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 		if (special_book.book != null)
 			responseData.specialBook = {
 				id: special_book.book?.id,
-				picture: `${(special_book.book?.picture?.url || '').startsWith('/') ? `${STRAPI_URL}${special_book.book?.picture?.url}` : special_book.book?.picture?.url}`,
+				picture: resolveURL(special_book.book?.picture?.url),
 			};
 
 		send200(responseData, res);
@@ -1555,7 +1559,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			return {
 				id: boughtBook.book.id,
 				name: boughtBook.book.name,
-				picture: (boughtBook.book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${boughtBook.book.picture?.url}` : boughtBook.book.picture?.url,
+				picture: resolveURL(boughtBook.book.picture?.url),
 			};
 		});
 
@@ -1563,7 +1567,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			return {
 				id: save.book.id,
 				name: save.book.name,
-				picture: (save.book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${save.book.picture?.url}` : save.book.picture?.url,
+				picture: resolveURL(save.book.picture?.url),
 			};
 		});
 
@@ -1598,7 +1602,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 				duration: book.audio_duration,
 				chapter_name: book.chapter_name,
 				chapter_number: book.number,
-				audioFile: (book.mp3_file?.url || '').startsWith('/') ? `${STRAPI_URL}${book.mp3_file?.url}` : book.mp3_file?.url,
+				audioFile: resolveURL(book.mp3_file?.url),
 			};
 		});
 		// console.log(responseData);
@@ -1646,7 +1650,7 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 			id: channel.id,
 			name: channel.name,
 			description: channel.description,
-			picture: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
+			picture: resolveURL(channel.cover_pic?.url),
 			followers: saved_podcasts.length,
 			is_saved,
 		};
@@ -1657,8 +1661,8 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 					id: episode.id,
 					name: episode.episode_name,
 					duration: episode.mp3_duration,
-					picture: `${STRAPI_URL_IP}${episode.picture?.url}`,
-					audioFile: `${STRAPI_URL_IP}${episode.audio_file_path?.url}`,
+					picture: resolveURL(episode.picture?.url),
+					audioFile: resolveURL(episode.audio_file_path?.url),
 					number: episode.episode_number,
 				};
 			})
@@ -1766,11 +1770,11 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		let absPdfPath = '';
 		if (is_paid_ebook) {
-			absPdfPath = (book?.pdf_book_path?.url || '').startsWith('/') ? (`${STRAPI_URL_IP}${book.pdf_book_path?.url}`) : (book.pdf_book_path?.url)
+			absPdfPath = resolveURL(book?.pdf_book_path?.url)
 		}
 		responseData.book = {
 			id: book.id,
-			picture: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+			picture: resolveURL(book.picture?.url),
 			name: book.name,
 			eBookPrice: book.online_book_price,
 			bookPrice: book.book_price,
@@ -1801,7 +1805,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		responseData.imageComments = book.picture_comment.map((comment) => {
 			return {
-				url: (comment?.url || '').startsWith('/') ? `${STRAPI_URL}${comment.url}` : comment.url,
+				url: resolveURL(comment?.url),
 			};
 		});
 
@@ -1819,7 +1823,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 				responseData.relatedBooks.push({
 					id: book.id,
 					name: book.name,
-					picture: (book.picture?.url || '').startsWith('/') ? `${STRAPI_URL_IP}${book.picture?.url}` : book.picture?.url,
+					picture: resolveURL(book.picture?.url),
 				});
 		});
 
