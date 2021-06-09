@@ -1680,7 +1680,6 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 });
 
 app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
-	console.log(req.headers);
 	try {
 		let responseData = {
 			book: {},
@@ -1688,7 +1687,6 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			comments: [],
 			relatedBooks: [],
 		};
-
 		let book = await axios({
 			url: `${STRAPI_URL}/books/${req.params.book_id}`,
 			method: "GET",
@@ -1745,7 +1743,11 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		let related_books = [];
 
-		await axios.all(authorRequests.map((authorRequest) => axios.get(authorRequest))).then((...res) => {
+		await axios.all(authorRequests.map((authorRequest) => axios.get(authorRequest, {
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`
+			}
+		}))).then((...res) => {
 			res[0].forEach((r) => r.data.forEach((re) => related_books.push(re)));
 		});
 
@@ -1758,9 +1760,9 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			else tempAuthorsString += `${author.author_name}  `;
 		});
 
-		let is_paid_book = customer_paid_books.data?.length != 0;
-		let is_paid_ebook = customer_paid_ebooks.data?.length != 0;
-		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0;
+		let is_paid_book = customer_paid_books.data?.length != 0 || (book?.book_price || 0) == 0;
+		let is_paid_ebook = customer_paid_ebooks.data?.length != 0 || (book?.online_book_price || 0) == 0;
+		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0 || (book?.audio_book_price || 0) == 0;
 
 		let absPdfPath = '';
 		if (is_paid_ebook) {
