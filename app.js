@@ -1047,7 +1047,7 @@ app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 		});
 
 		console.log(saves);
-		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, { headers: `Bearer ${req.headers.authorization}` })));
+		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, { headers: { Authorization: `Bearer ${req.headers.authorization}` } })));
 		send200({}, res);
 	} catch (error) {
 		send400("error", res);
