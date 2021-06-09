@@ -1454,7 +1454,7 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 			return {
 				id: channel.podcast_channel?.id,
 				name: channel.podcast_channel?.name,
-				picture: `${STRAPI_URL_IP}${channel.podcast_channel?.cover_pic?.url}`,
+				picture: resolveURL(channel.podcast_channel?.cover_pic?.url),
 			};
 		});
 
@@ -1463,7 +1463,7 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 				responseData.featuredPodcastChannels.push({
 					id: channel.id,
 					name: channel.name,
-					picture: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
+					picture: resolveURL(channel.cover_pic?.url),
 				});
 		});
 
@@ -1471,7 +1471,7 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 			responseData.latestPodcasts.push({
 				id: podcast.id,
 				name: podcast.episode_name,
-				picture: `${STRAPI_URL_IP}${podcast.picture?.url}`,
+				picture: resolveURL(podcast.picture?.url),
 				channel_id: podcast.podcast_channel.id,
 			});
 		});
@@ -1487,7 +1487,7 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 					return {
 						id: channel.id,
 						name: channel.name,
-						picture_path: `${STRAPI_URL_IP}${channel.cover_pic?.url}`,
+						picture_path: resolveURL(channel.cover_pic?.url),
 						is_saved: is_saved != undefined,
 					};
 				});
