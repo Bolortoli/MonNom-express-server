@@ -125,7 +125,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
 			sender_invoice_no: tempInvoiceId,
 			invoice_receiver_code: req.body.user_id.toString(),
-			invoice_description: `Monnom Audio Book - ${req.body.book_name} төлбөр.`,
+			invoice_description: `Monnom - ${req.body.book_name} төлбөр.`,
 			amount: null,
 			callback_url: `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order?.id}`,
 			// callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
