@@ -1096,9 +1096,9 @@ app.get("/app/live", async (req, res, next) => {
 	let channel = await axios({
 		url: `${STRAPI_URL}/radio-channels`,
 		method: "GET",
-		// headers: {
-		// 	Authorization: `Bearer ${req.headers.authorization}`,
-		// },
+		headers: {
+			Authorization: `Bearer ${req.headers.authorization}`,
+		},
 	}).catch((err) => {
 		console.log(err);
 		throw "error fetch data";
