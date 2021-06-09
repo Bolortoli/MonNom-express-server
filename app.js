@@ -1801,7 +1801,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		responseData.imageComments = book.picture_comment.map((comment) => {
 			return {
-				url: `${STRAPI_URL_IP}${comment.url}`,
+				url: (comment?.url || '').startsWith('/') ? `${STRAPI_URL}${comment.url}` : comment.url,
 			};
 		});
 
