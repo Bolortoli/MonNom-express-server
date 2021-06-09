@@ -1551,7 +1551,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			return {
 				id: channel.podcast_channel.id,
 				name: channel.podcast_channel.name,
-				picture: `${STRAPI_URL_IP}${channel.podcast_channel.cover_pic?.url}`,
+				picture: resolveURL(channel.podcast_channel.cover_pic?.url),
 			};
 		});
 
