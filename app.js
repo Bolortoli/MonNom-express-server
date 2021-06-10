@@ -80,11 +80,24 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 
 		qpay_access = qpay_access.data;
 		book = book.data;
-		let order_destination = req.body.order_destination;
-		if (order_destination) {
-			order_destination = order_destination.replaceAll(' ', '+')
+		let delivery;
+		if (req.params.payment_type === 'book') {
+			const deliveryCreateResponse = await axios({
+				url: `${STRAPI_URL}/delivery-registrations`,
+				method: 'POST',
+				data: {
+					order_destination: req.body.order_destination,
+					customer: req.body.user_id,
+					is_paid: false
+				},
+				headers: {
+					Authorization: `Bearer ${req.headers.authorization}`
+				}
+			});
+			delivery = deliveryCreateResponse.data;
 		}
-		let callback_url = `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order_destination}`
+
+		let callback_url = `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${delivery?.id}`
 		callback_url = callback_url.substr(0, Math.min(2048, callback_url.length));
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
@@ -143,21 +156,6 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		});
 		const payment = paymentCreateResponse.data;
 
-		// if (req.params.payment_type === 'book') {
-		// 	const deliveryCreateResponse = await axios({
-		// 		url: `${STRAPI_URL}/delivery-registration`,
-		// 		method: 'POST',
-		// 		data: {
-		// 			order_destination: req.body.order_destination,
-		// 			customer_paid_book: req.body.payment.id,
-		// 			customer: req.body.user_id,
-		// 		},
-		// 		headers: {
-		// 			Authorization: `Bearer ${req.headers.authorization}`
-		// 		}
-		// 	});
-		// }
-
 		// hide invoice_id from client so that they can't hack it
 		let response_data = { ...qpay_invoice_creation.data };
 		delete response_data["invoice_id"];
@@ -169,7 +167,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_address?", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_id?", async (req, res, next) => {
 
 	// callback validation
 	if (req.params.payment_collection_name !== 'customer-paid-books') {
@@ -214,20 +212,17 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			});
 
 		// create delivery
-		if (req.params.delivery_address) {
-			let delivery_address = req.params.delivery_address.replaceAll('+', ' ')
+		if (req.params.delivery_id) {
 			try {
-				await apiClient.post(`/delivery-registrations`, {
-					customer_paid_book: bookPaymentResponse.data.id,
-					customer: paymentUpdateResponse.users_permissions_user.id,
-					order_destination: delivery_address
+				await apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, {
+					is_paid: true
 				}, {
 					headers: {
 						Authorization: `Bearer ${req.params.auth_token}`
 					}
 				});
 			} catch (e) {
-				console.log('Delivery create failed');
+				console.log('Delivery put failed');
 			}
 		}
 
