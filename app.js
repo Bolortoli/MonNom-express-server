@@ -1014,22 +1014,30 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 
 		// ------------ CONVERT SECONDS TO TOTAL DURATION MODULO ------------
 		differce %= totalDuration;
+		// console.log("differce");
+		// console.log(differce);
 
 		// ------------ FIND CURRENT MP3 FILE PATH ------------
-		channel_audio.forEach((audio) => {
-			if (differce < parseInt(audio.audio_duration)) {
-				responseData.current_second = parseInt(audio.audio_duration) - (parseInt(audio.audio_duration) - differce);
-				responseData.episode_id = audio.id;
-			} else {
-				differce -= parseInt(audio.audio_duration);
-			}
-		});
+		try {
+			channel_audio.forEach((audio) => {
+				// console.log(audio.id);
+
+				if (differce < parseInt(audio.audio_duration)) {
+					responseData.current_second = parseInt(audio.audio_duration) - (parseInt(audio.audio_duration) - differce);
+					responseData.episode_id = audio.id;
+					throw "break";
+				} else {
+					differce -= parseInt(audio.audio_duration);
+				}
+			});
+		} catch (error) {}
 
 		responseData.episodes = channel_audio.map((episode) => {
 			return {
 				id: episode.id,
 				mp3_file_path: resolveURL(episode.audio?.url),
 				duration: episode.audio_duration,
+				stack: episode.stack_number,
 			};
 		});
 
