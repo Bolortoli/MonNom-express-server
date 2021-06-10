@@ -483,17 +483,17 @@ app.get("/book-single-by-author/:id", async (req, res) => {
 										});
 								})
 								.catch((err) => {
-									throw "broken3";
+									throw err + "broken3";
 								});
 						})
 						.catch((err) => {
-							throw "broken4";
+							throw err + "broken4";
 						});
 
 					res.send(sendData);
 				})
 				.catch((err) => {
-					throw "broken5";
+					throw err + "broken5";
 				});
 		})
 		.catch((err) => {
@@ -645,7 +645,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/settings`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -655,7 +655,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/podcast-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -665,7 +665,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error2";
@@ -675,7 +675,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-authors`,
 			method: "GET",
 			headers: {
-				Authorization: `${req.headers.authorization}`,
+				Authorization: `Bearer ${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
