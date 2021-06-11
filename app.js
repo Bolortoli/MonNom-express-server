@@ -72,43 +72,27 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		let qpay_access = await axios({ method: "POST", url: QPAY_MERCHANT_AUTHENTICATION, auth: { username: QPAY_MERCHANT_USERNAME, password: QPAY_MERCHANT_PASSWORD } }).catch((err) => {
 			throw "QPAY authorization failed";
 		});
+
 		// For get book price
 		let book = await axios({ method: "GET", url: `${STRAPI_URL}/books/${req.body.book_id}`, headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
 			throw "Fetch book failed";
 		});
 
-		// create delivery
-		let order;
-		if (req.body.order_destination?.length) {
-			try {
-				const orderCreateResponse = await axios({
-					method: "POST",
-					url: `${STRAPI_URL}/delivery-registrations`,
-					data: {
-						order_destination: req.body.order_destination,
-						customer: req.body.user_id,
-					},
-					headers: {
-						Authorization: `Bearer ${req.headers.authorization}`,
-					},
-				});
-				order = orderCreateResponse.data;
-			} catch (e) {
-				console.log("order create failed");
-				console.log(e);
-			}
-		}
-
 		qpay_access = qpay_access.data;
 		book = book.data;
-
+		let order_destination = req.body.order_destination;
+		if (order_destination) {
+			order_destination = order_destination.replaceAll(' ', '+')
+		}
+		let callback_url = `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order_destination}`
+		callback_url = callback_url.substr(0, Math.min(2048, callback_url.length));
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
 			sender_invoice_no: tempInvoiceId,
 			invoice_receiver_code: req.body.user_id.toString(),
 			invoice_description: `Monnom - ${req.body.book_name} төлбөр.`,
 			amount: null,
-			callback_url: `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order?.id}`,
+			callback_url,
 			// callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
 		};
 
@@ -134,9 +118,9 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			headers: {
 				Authorization: `Bearer ${qpay_access.access_token}`,
 			},
-			data,
+			data
 		}).catch((err) => {
-			console.log(err);
+			console.log(err.response.data);
 			throw "Invoice creation failed";
 		});
 
@@ -185,7 +169,14 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_id?", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_address?", async (req, res, next) => {
+
+	// callback validation
+	if (req.params.payment_collection_name !== 'customer-paid-books') {
+		send400({ error: 'Wrong Collection' }, res)
+		return;
+	}
+
 	try {
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
@@ -222,9 +213,22 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 				throw "Failed to save on collection name";
 			});
 
-		// mark delivery payment
-		if (req.params.delivery_id) {
-			apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, { customer_paid_book: bookPaymentResponse.data.id });
+		// create delivery
+		if (req.params.delivery_address) {
+			let delivery_address = req.params.delivery_address.replaceAll('+', ' ')
+			try {
+				await apiClient.post(`/delivery-registrations`, {
+					customer_paid_book: bookPaymentResponse.data.id,
+					customer: paymentUpdateResponse.users_permissions_user.id,
+					order_destination: delivery_address
+				}, {
+					headers: {
+						Authorization: `Bearer ${req.params.auth_token}`
+					}
+				});
+			} catch (e) {
+				console.log('Delivery create failed');
+			}
 		}
 
 		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
@@ -1030,7 +1034,7 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 					differce -= parseInt(audio.audio_duration);
 				}
 			});
-		} catch (error) {}
+		} catch (error) { }
 
 		responseData.episodes = channel_audio.map((episode) => {
 			return {
@@ -1579,8 +1583,8 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			audioChapters:
 				is_paid_audio_book && book.has_audio
 					? book.book_audios?.map((chapter) => {
-							return { id: chapter.id, name: chapter.chapter_name, duration: chapter.audio_duration, number: chapter.number };
-					  })
+						return { id: chapter.id, name: chapter.chapter_name, duration: chapter.audio_duration, number: chapter.number };
+					})
 					: null,
 		};
 
