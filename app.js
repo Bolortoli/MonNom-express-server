@@ -82,9 +82,9 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		book = book.data;
 		let order_destination = req.body.order_destination;
 		if (order_destination) {
-			order_destination = order_destination.replaceAll(' ', '+')
+			order_destination = order_destination.replaceAll(" ", "+");
 		}
-		let callback_url = `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order_destination}`
+		let callback_url = `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order_destination}`;
 		callback_url = callback_url.substr(0, Math.min(2048, callback_url.length));
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
@@ -118,7 +118,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			headers: {
 				Authorization: `Bearer ${qpay_access.access_token}`,
 			},
-			data
+			data,
 		}).catch((err) => {
 			console.log(err.response.data);
 			throw "Invoice creation failed";
@@ -170,10 +170,9 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 });
 
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_address?", async (req, res, next) => {
-
 	// callback validation
-	if (req.params.payment_collection_name !== 'customer-paid-books') {
-		send400({ error: 'Wrong Collection' }, res)
+	if (req.params.payment_collection_name !== "customer-paid-books") {
+		send400({ error: "Wrong Collection" }, res);
 		return;
 	}
 
@@ -215,19 +214,23 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 
 		// create delivery
 		if (req.params.delivery_address) {
-			let delivery_address = req.params.delivery_address.replaceAll('+', ' ')
+			let delivery_address = req.params.delivery_address.replaceAll("+", " ");
 			try {
-				await apiClient.post(`/delivery-registrations`, {
-					customer_paid_book: bookPaymentResponse.data.id,
-					customer: paymentUpdateResponse.users_permissions_user.id,
-					order_destination: delivery_address
-				}, {
-					headers: {
-						Authorization: `Bearer ${req.params.auth_token}`
+				await apiClient.post(
+					`/delivery-registrations`,
+					{
+						customer_paid_book: bookPaymentResponse.data.id,
+						customer: paymentUpdateResponse.users_permissions_user.id,
+						order_destination: delivery_address,
+					},
+					{
+						headers: {
+							Authorization: `Bearer ${req.params.auth_token}`,
+						},
 					}
-				});
+				);
 			} catch (e) {
-				console.log('Delivery create failed');
+				console.log("Delivery create failed");
 			}
 		}
 
@@ -1034,7 +1037,7 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 					differce -= parseInt(audio.audio_duration);
 				}
 			});
-		} catch (error) { }
+		} catch (error) {}
 
 		responseData.episodes = channel_audio.map((episode) => {
 			return {
@@ -1304,12 +1307,14 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 		saved_podcasts = saved_podcasts.data;
 		latest_podcasts = latest_podcasts.data.slice(0, 12);
 
-		responseData.savedPodcastChannels = saved_podcasts.map((channel) => {
-			return {
-				id: channel.podcast_channel?.id,
-				name: channel.podcast_channel?.name,
-				picture: resolveURL(channel.podcast_channel?.cover_pic?.url),
-			};
+		saved_podcasts.map((channel) => {
+			if (responseData.savedPodcastChannels.filter((searchChannel) => searchChannel.id == channel.podcast_channel.id).length == 0) {
+				responseData.savedPodcastChannels.push({
+					id: channel.podcast_channel?.id,
+					name: channel.podcast_channel?.name,
+					picture: resolveURL(channel.podcast_channel?.cover_pic?.url),
+				});
+			}
 		});
 
 		podcast_channels.forEach((channel) => {
@@ -1583,8 +1588,8 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			audioChapters:
 				is_paid_audio_book && book.has_audio
 					? book.book_audios?.map((chapter) => {
-						return { id: chapter.id, name: chapter.chapter_name, duration: chapter.audio_duration, number: chapter.number };
-					})
+							return { id: chapter.id, name: chapter.chapter_name, duration: chapter.audio_duration, number: chapter.number };
+					  })
 					: null,
 		};
 
