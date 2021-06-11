@@ -1397,28 +1397,22 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 		boughtBooks = boughtBooks.data;
 		savedBooks = savedBooks.data;
 
-		responseData.podcastChannels = podcast_channels.map((channel) => {
-			return {
-				id: channel.podcast_channel.id,
-				name: channel.podcast_channel.name,
-				picture: resolveURL(channel.podcast_channel.cover_pic?.url),
-			};
+		podcast_channels.forEach((channel) => {
+			if (responseData.podcastChannels.filter((searchChannel) => searchChannel.id == channel.podcast_channel.id).length == 0) {
+				responseData.podcastChannels.push({ id: channel.podcast_channel?.id, name: channel.podcast_channel?.name, picture: resolveURL(channel.podcast_channel.cover_pic?.url) });
+			}
 		});
 
-		responseData.books = boughtBooks.map((boughtBook) => {
-			return {
-				id: boughtBook.book.id,
-				name: boughtBook.book.name,
-				picture: resolveURL(boughtBook.book.picture?.url),
-			};
+		boughtBooks.forEach((boughtBook) => {
+			if (responseData.books.filter((searchBook) => searchBook.id == boughtBook.book?.id).length == 0) {
+				responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
+			}
 		});
 
-		responseData.saved = savedBooks.map((save) => {
-			return {
-				id: save.book.id,
-				name: save.book.name,
-				picture: resolveURL(save.book.picture?.url),
-			};
+		savedBooks.forEach((save) => {
+			if (responseData.saved.filter((searchBook) => searchBook.id == save.book?.id).length == 0) {
+				responseData.saved.push({ id: save.book?.id, name: save.book?.name, picture: resolveURL(save.book?.picture?.url) });
+			}
 		});
 
 		send200({ responseData }, res);
