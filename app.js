@@ -131,7 +131,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			headers: {
 				Authorization: `Bearer ${qpay_access.access_token}`,
 			},
-			data
+			data,
 		}).catch((err) => {
 			console.log(err.response.data);
 			throw "Invoice creation failed";
@@ -150,6 +150,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 				book_payment_type: req.params.payment_type,
 				book: req.body.book_id,
 				invoice_id: tempInvoiceId,
+				callback_url
 			},
 		}).catch(() => {
 			throw "Save payment failed";
@@ -170,8 +171,8 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_id?", async (req, res, next) => {
 
 	// callback validation
-	if (req.params.payment_collection_name !== 'customer-paid-books') {
-		send400({ error: 'Wrong Collection' }, res)
+	if (req.params.payment_collection_name !== "customer-paid-books") {
+		send400({ error: "Wrong Collection" }, res);
 		return;
 	}
 
@@ -224,6 +225,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			} catch (e) {
 				console.log('Delivery put failed');
 			}
+
 		}
 
 		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
@@ -1299,12 +1301,14 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 		saved_podcasts = saved_podcasts.data;
 		latest_podcasts = latest_podcasts.data.slice(0, 12);
 
-		responseData.savedPodcastChannels = saved_podcasts.map((channel) => {
-			return {
-				id: channel.podcast_channel?.id,
-				name: channel.podcast_channel?.name,
-				picture: resolveURL(channel.podcast_channel?.cover_pic?.url),
-			};
+		saved_podcasts.map((channel) => {
+			if (responseData.savedPodcastChannels.filter((searchChannel) => searchChannel.id == channel.podcast_channel.id).length == 0) {
+				responseData.savedPodcastChannels.push({
+					id: channel.podcast_channel?.id,
+					name: channel.podcast_channel?.name,
+					picture: resolveURL(channel.podcast_channel?.cover_pic?.url),
+				});
+			}
 		});
 
 		podcast_channels.forEach((channel) => {
@@ -1396,28 +1400,22 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 		boughtBooks = boughtBooks.data;
 		savedBooks = savedBooks.data;
 
-		responseData.podcastChannels = podcast_channels.map((channel) => {
-			return {
-				id: channel.podcast_channel.id,
-				name: channel.podcast_channel.name,
-				picture: resolveURL(channel.podcast_channel.cover_pic?.url),
-			};
+		podcast_channels.forEach((channel) => {
+			if (responseData.podcastChannels.filter((searchChannel) => searchChannel.id == channel.podcast_channel.id).length == 0) {
+				responseData.podcastChannels.push({ id: channel.podcast_channel?.id, name: channel.podcast_channel?.name, picture: resolveURL(channel.podcast_channel.cover_pic?.url) });
+			}
 		});
 
-		responseData.books = boughtBooks.map((boughtBook) => {
-			return {
-				id: boughtBook.book.id,
-				name: boughtBook.book.name,
-				picture: resolveURL(boughtBook.book.picture?.url),
-			};
+		boughtBooks.forEach((boughtBook) => {
+			if (responseData.books.filter((searchBook) => searchBook.id == boughtBook.book?.id).length == 0) {
+				responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
+			}
 		});
 
-		responseData.saved = savedBooks.map((save) => {
-			return {
-				id: save.book.id,
-				name: save.book.name,
-				picture: resolveURL(save.book.picture?.url),
-			};
+		savedBooks.forEach((save) => {
+			if (responseData.saved.filter((searchBook) => searchBook.id == save.book?.id).length == 0) {
+				responseData.saved.push({ id: save.book?.id, name: save.book?.name, picture: resolveURL(save.book?.picture?.url) });
+			}
 		});
 
 		send200({ responseData }, res);
