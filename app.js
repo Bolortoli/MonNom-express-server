@@ -137,21 +137,23 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			throw "Invoice creation failed";
 		});
 
+		const paymenCreatePayload = {
+			users_permissions_user: req.body.user_id,
+			payment_amount: book.online_book_price,
+			is_approved: false,
+			book_payment_type: req.params.payment_type,
+			book: req.body.book_id,
+			invoice_id: tempInvoiceId,
+			callback_url
+		}
+		console.log(paymenCreatePayload);
 		const paymentCreateResponse = await axios({
 			method: "POST",
 			url: `${STRAPI_URL}/payments`,
 			headers: {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
-			data: {
-				users_permissions_user: req.body.user_id,
-				payment_amount: book.online_book_price,
-				is_approved: false,
-				book_payment_type: req.params.payment_type,
-				book: req.body.book_id,
-				invoice_id: tempInvoiceId,
-				callback_url
-			},
+			data: paymenCreatePayload,
 		}).catch(() => {
 			throw "Save payment failed";
 		});
@@ -171,7 +173,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_id?", async (req, res, next) => {
 
 	// callback validation
-	if (req.params.payment_collection_name !== "customer-paid-books") {
+	if (['customer-paid-books', 'customer-paid-ebooks', 'customer-paid-audio-books'].indexOf(req.params.payment_collection_name) == -1) {
 		send400({ error: "Wrong Collection" }, res);
 		return;
 	}
