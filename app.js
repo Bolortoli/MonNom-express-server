@@ -150,6 +150,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 				book_payment_type: req.params.payment_type,
 				book: req.body.book_id,
 				invoice_id: tempInvoiceId,
+				callback_url
 			},
 		}).catch(() => {
 			throw "Save payment failed";
