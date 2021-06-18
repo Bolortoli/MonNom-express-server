@@ -237,7 +237,22 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			url: "https://fcm.googleapis.com/fcm/send",
 			method: "POST",
 			headers: { Authorization: `key=${process.env.FCM_SERVER_KEY}` },
-			data: { registration_ids: [fcmToken], channel_id: "fcm_default_channel", notification: { title: "Төлбөр амжилттай", body: "" }, data: { title: "Төлбөр амжилттай", body: "", book_id: paymentUpdateResponse.book.id, type: "book_payment" } },
+			data: {
+				registration_ids: [fcmToken],
+				channel_id: "notifee_channel1",
+				notification: { title: "Төлбөр амжилттай", body: "" },
+				data: {
+					title: "Төлбөр амжилттай",
+					body: "",
+					book_id: paymentUpdateResponse.book.id,
+					type: "book_payment",
+					content_available: true
+				},
+				android: {
+					"priority": "high"
+				},
+
+			},
 		}).catch((err) => {
 			console.log(err);
 			throw "Failed to send notification";
