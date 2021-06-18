@@ -249,7 +249,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 					content_available: true
 				},
 				android: {
-					"priority": "high"
+					"priority": "HIGH"
 				},
 
 			},
