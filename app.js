@@ -4,12 +4,18 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import multer from "multer";
 import dotenv from "dotenv";
+import faker from 'faker';
+import randToken from 'rand-token';
+
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 const STRAPI_URL = "https://strapi.monnom.mn";
+const EXPRESS_URL = 'https://express.monnom.mn';
+// const STRAPI_URL = "http://localhost:1337";
+// const EXPRESS_URL = 'http://localhost:3000';
 
 // For OTP
 const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
@@ -40,6 +46,109 @@ const fileStorageEngine = multer.diskStorage({
 });
 
 const upload = multer({ storage: fileStorageEngine });
+
+// temp user
+const createTempUser = async () => {
+	const email = faker.internet.email();
+	const username = faker.name.findName();
+	const password = faker.internet.password();
+	const userCreateResponse = await axios.post(`${STRAPI_URL}/auth/local/register`, {
+		username,
+		email,
+		password
+	});
+	const user = userCreateResponse.data;
+	return {
+		user,
+		delete: async () => {
+			return axios.delete(`${STRAPI_URL}/users/${user.user.id}`, {
+				headers: {
+					Authorization: `Bearer ${user.jwt}`
+				}
+			});
+		}
+	}
+}
+
+// send password reset url
+app.post('/user/forgot-password', async (req, res) => {
+	try {
+		const { username } = req.body;
+		const tempUser = await createTempUser();
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `Bearer ${tempUser.user.jwt}`
+			}
+		});
+		const userToResetPwdResponse = await apiClient.get(`/users?username=${username}&_limit=1`);
+
+		if (!userToResetPwdResponse.data.length) {
+			console.log('no user found')
+			send400('no user found', res)
+		} else {
+			const user = userToResetPwdResponse.data[0];
+			const passwordResetToken = randToken.generate(64);
+			const passwordResetTokenResponse = await apiClient.put(`/users/${user.id}`, {
+				resetPasswordToken: passwordResetToken,
+			});
+			// const passwordResetWebCallbackURL = `${EXPRESS_URL}/user/forgot-password/${passwordResetToken}`;
+			let names = user.fullname.split(' ');
+			let first_name = names[0];
+			let last_name = names.length > 1 ? names[1] : '';
+			const passwordResetDeeplinkURL = `monnom-app://user?password_reset_token=${passwordResetToken}&username=${user.username}&first_name=${first_name}&last_name=${last_name}`;
+			await axios({
+				url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom newtreh nuuts kod shinechleh: ${passwordResetDeeplinkURL}`,
+				method: "GET",
+			})
+			res.send(true);
+
+		}
+		await tempUser.delete();
+	} catch (e) {
+		send400(e, res)
+
+	}
+});
+
+// password reset callback
+app.get('/user/forgot-password/reset', async (req, res) => {
+
+	try {
+		const { token, username, password } = req.body;
+		if (!token || !username || !password) {
+			send400('Мэдээлэл дутуу', res);
+			return
+		}
+		if ((password || '').length < 4) {
+			send400('3 -с олон тэмдэгт ашиглана уу', res);
+			return
+		}
+		const tempUser = await createTempUser();
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `Bearer ${tempUser.user.jwt}`
+			}
+		});
+
+		const userResponse = await apiClient.get(`/users?resetPasswordToken=${token}&username=${username}`);
+		const user = userResponse.data.length ? userResponse.data[0] : null;
+		const userUpdateResponse = await apiClient.put(`/users/${user.id}`, {
+			password,
+			resetPasswordToken: null
+		})
+		if (user) {
+			res.send(userUpdateResponse.data)
+		} else {
+			send400('invalid token', res)
+		}
+	} catch (e) {
+		console.log(e);
+		send400(e, res);
+	}
+	await tempUser.delete();
+});
 
 // ----------------------------- PAYEMNT APIs -----------------------------
 
@@ -97,7 +206,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			delivery = deliveryCreateResponse.data;
 		}
 
-		let callback_url = `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${delivery?.id}`
+		let callback_url = `${EXPRESS_URL}/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${delivery?.id}`
 		callback_url = callback_url.substr(0, Math.min(2048, callback_url.length));
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
@@ -106,7 +215,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			invoice_description: `Monnom - ${req.body.book_name} төлбөр.`,
 			amount: null,
 			callback_url,
-			// callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
+			// callback_url: `${EXPRESS_URL}/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
 		};
 
 		switch (req.params.payment_type) {

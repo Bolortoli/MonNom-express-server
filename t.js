@@ -1,5 +1,5 @@
-const slugify = require('slugify')
+import randomEmail from 'random-email';
 
-s = 'asd qwe'
-
-console.log(s.replace(' ', '%%'))
+for (let i = 0; i < 10; i++) {
+    console.log(randomEmail({ domain: 'example.com' }))
+}
