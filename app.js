@@ -16,9 +16,8 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 const STRAPI_URL = "https://strapi.monnom.mn";
-const EXPRESS_URL = 'https://express.monnom.mn';
-// const STRAPI_URL = "http://localhost:1337";
-// const EXPRESS_URL = 'http://localhost:3000';
+// const EXPRESS_URL = 'https://express.monnom.mn';
+const EXPRESS_URL = 'http://localhost:3000';
 
 // For OTP
 const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
@@ -50,12 +49,20 @@ const fileStorageEngine = multer.diskStorage({
 	},
 });
 
+const resolveURL = (url) => {
+	return (url || "").startsWith("/") ? `${STRAPI_URL}${url}` : url;
+};
+
+const fakeEmail = () => {
+	return `guest${create_temp_unique_text('xxxxxxxxxxxxx')}@monnomguest.com`;
+}
+
 const upload = multer({ storage: fileStorageEngine });
 
 // temp user
 const createTempUser = async () => {
-	const email = 'temp' + faker.internet.email();
-	const username = 'temp' + faker.name.findName();
+	const email = fakeEmail();
+	const username = `Temp ${faker.name.lastName()}`;
 	const password = faker.internet.password();
 	const userCreateResponse = await axios.post(`${STRAPI_URL}/auth/local/register`, {
 		username,
@@ -73,6 +80,28 @@ const createTempUser = async () => {
 			});
 		}
 	}
+}
+
+// guest
+const createGuest = async ({ fcm_token }) => {
+	const email = fakeEmail();
+	const username = email;
+	const password = faker.internet.password();
+	const fullname = `Guest ${faker.name.lastName()}`;
+
+	const createResponse = await axios.post(`${STRAPI_URL}/auth/local/register`, {
+		username,
+		email,
+		fullname,
+		password,
+		is_guest: true,
+		fcm_token,
+		birthday: moment('2000-01-01 00:00:00').format('YYYY-MM-DD HH:mm:ss'),
+		gender: 'Male',
+		phone: faker.phone.phoneNumber()
+	});
+	const user = createResponse.data;
+	return user;
 }
 
 // send password reset url
@@ -200,10 +229,6 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 });
 
 // ----------------------------- PAYEMNT APIs -----------------------------
-
-const resolveURL = (url) => {
-	return (url || "").startsWith("/") ? `${STRAPI_URL}${url}` : url;
-};
 
 app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	try {
@@ -1053,6 +1078,21 @@ app.get("/all-books-list", async (req, res) => {
 
 // ----------------------------- APP APIs -----------------------------
 
+// guest login
+// app.post('/app/guest/login', async (req, res) => {
+
+// });
+
+app.post('/app/guest/signup', async (req, res) => {
+	try {
+		const guest = await createGuest({ fcm_token: req.body?.fcm_token });
+		send200(guest, res);
+	} catch (e) {
+		console.log(e);
+		send400('Error creating guest', res);
+	}
+});
+
 // Unsave podcast channel
 app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 	try {
@@ -1409,7 +1449,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			});
 		});
 
-		if (special_book.book != null)
+		if (special_book?.book != null)
 			responseData.specialBook = {
 				id: special_book.book?.id,
 				picture: resolveURL(special_book.book?.picture?.url),
