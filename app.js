@@ -98,7 +98,7 @@ app.post('/user/forgot-password', async (req, res) => {
 				resetPasswordToken: null,
 				resetPasswordTokenIssuedAt: codeSentAt
 			});
-			const passwordResetDeeplinkURL = `monnom-app://user?password_reset_token=${resetPasswordCode}&username=${user.username}&first_name=${first_name}&last_name=${last_name}`;
+			// const passwordResetDeeplinkURL = `monnom-app://user?password_reset_token=${resetPasswordCode}&username=${user.username}&first_name=${first_name}&last_name=${last_name}`;
 			await axios({
 				url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom: tanii neg udaagiin nuuts kod: ${resetPasswordCode}`,
 				method: "GET",
