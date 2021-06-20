@@ -16,8 +16,8 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 const STRAPI_URL = "https://strapi.monnom.mn";
-// const EXPRESS_URL = 'https://express.monnom.mn';
-const EXPRESS_URL = 'http://localhost:3000';
+const EXPRESS_URL = 'https://express.monnom.mn';
+// const EXPRESS_URL = 'http://localhost:3000';
 
 // For OTP
 const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
