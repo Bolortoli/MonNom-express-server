@@ -92,13 +92,12 @@ app.post('/user/forgot-password', async (req, res) => {
 		} else {
 			const user = userToResetPwdResponse.data[0];
 			const resetPasswordCode = randomatic('0', 6); // n random digits
-			const codeSentAt = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+			const codeSentAt = moment.utc().format('YYYY-MM-DD HH:mm:ss');
 			const resetPasswordCodeResponse = await apiClient.put(`/users/${user.id}`, {
 				resetPasswordCode,
 				resetPasswordToken: null,
 				resetPasswordTokenIssuedAt: codeSentAt
 			});
-			// const passwordResetDeeplinkURL = `monnom-app://user?password_reset_token=${resetPasswordCode}&username=${user.username}&first_name=${first_name}&last_name=${last_name}`;
 			await axios({
 				url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom: tanii neg udaagiin nuuts kod: ${resetPasswordCode}`,
 				method: "GET",
@@ -137,7 +136,7 @@ app.post('/user/forgot-password/confirm', async (req, res) => {
 
 		const user = usersResponse.data[0];
 		// хугацаа шалгах
-		const now = moment(new Date());
+		const now = moment.utc();
 		const due = moment(user.resetPasswordTokenIssuedAt);
 		const delta = moment.duration(now.diff(due));
 		if (delta.asMinutes() > PASSWORD_RESET_VALID_MINUTES) {
@@ -147,7 +146,7 @@ app.post('/user/forgot-password/confirm', async (req, res) => {
 		await apiClient.put(`/users/${user.id}`, {
 			resetPasswordToken,
 			resetPasswordCode: null,
-			resetPasswordTokenIssuedAt: moment(new Date()).format('YYYY-MM-DD HH:mm:ss')
+			resetPasswordTokenIssuedAt: moment.utc().format('YYYY-MM-DD HH:mm:ss')
 		})
 		if (user) {
 			send200({ token: resetPasswordToken }, res);
