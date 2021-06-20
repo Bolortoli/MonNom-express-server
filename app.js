@@ -5,17 +5,20 @@ import cors from "cors";
 import multer from "multer";
 import dotenv from "dotenv";
 import faker from 'faker';
+import moment from 'moment';
 import randToken from 'rand-token';
+import randomatic from 'randomatic';
+
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-const STRAPI_URL = "https://strapi.monnom.mn";
-const EXPRESS_URL = 'https://express.monnom.mn';
-// const STRAPI_URL = "http://localhost:1337";
-// const EXPRESS_URL = 'http://localhost:3000';
+// const STRAPI_URL = "https://strapi.monnom.mn";
+// const EXPRESS_URL = 'https://express.monnom.mn';
+const STRAPI_URL = "http://localhost:1337";
+const EXPRESS_URL = 'http://localhost:3000';
 
 // For OTP
 const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
@@ -31,6 +34,8 @@ const QPAY_MERCHANT_AUTHENTICATION = "https://merchant.qpay.mn/v2/auth/token";
 const PAYMENT_EBOOK_MAGIC_WORD = "ebook";
 const PAYMENT_AUDIO_BOOK_MAGIC_WORD = "audio-book";
 const PAYMENT_BOOK_MAGIC_WORD = "book";
+
+const PASSWORD_RESET_VALID_MINUTES = 1;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -49,8 +54,8 @@ const upload = multer({ storage: fileStorageEngine });
 
 // temp user
 const createTempUser = async () => {
-	const email = faker.internet.email();
-	const username = faker.name.findName();
+	const email = 'temp' + faker.internet.email();
+	const username = 'temp' + faker.name.findName();
 	const password = faker.internet.password();
 	const userCreateResponse = await axios.post(`${STRAPI_URL}/auth/local/register`, {
 		username,
@@ -72,9 +77,9 @@ const createTempUser = async () => {
 
 // send password reset url
 app.post('/user/forgot-password', async (req, res) => {
+	const tempUser = await createTempUser();
 	try {
 		const { username } = req.body;
-		const tempUser = await createTempUser();
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
@@ -82,38 +87,81 @@ app.post('/user/forgot-password', async (req, res) => {
 			}
 		});
 		const userToResetPwdResponse = await apiClient.get(`/users?username=${username}&_limit=1`);
-
 		if (!userToResetPwdResponse.data.length) {
-			console.log('no user found')
-			send400('no user found', res)
+			throw 'no user found'
 		} else {
 			const user = userToResetPwdResponse.data[0];
-			const passwordResetToken = randToken.generate(64);
-			const passwordResetTokenResponse = await apiClient.put(`/users/${user.id}`, {
-				resetPasswordToken: passwordResetToken,
+			const resetPasswordCode = randomatic('0', 6); // n random digits
+			const codeSentAt = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+			const resetPasswordCodeResponse = await apiClient.put(`/users/${user.id}`, {
+				resetPasswordCode,
+				resetPasswordToken: null,
+				resetPasswordTokenIssuedAt: codeSentAt
 			});
-			// const passwordResetWebCallbackURL = `${EXPRESS_URL}/user/forgot-password/${passwordResetToken}`;
-			let names = user.fullname.split(' ');
-			let first_name = names[0];
-			let last_name = names.length > 1 ? names[1] : '';
-			const passwordResetDeeplinkURL = `monnom-app://user?password_reset_token=${passwordResetToken}&username=${user.username}&first_name=${first_name}&last_name=${last_name}`;
+			const passwordResetDeeplinkURL = `monnom-app://user?password_reset_token=${resetPasswordCode}&username=${user.username}&first_name=${first_name}&last_name=${last_name}`;
 			await axios({
-				url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom newtreh nuuts kod shinechleh: ${passwordResetDeeplinkURL}`,
+				url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom: tanii neg udaagiin nuuts kod: ${resetPasswordCode}`,
 				method: "GET",
 			})
-			res.send(true);
-
+			send200({
+				codeSentAt,
+				minutes: PASSWORD_RESET_VALID_MINUTES,
+				// resetPasswordCode
+			}, res);
 		}
-		await tempUser.delete();
 	} catch (e) {
+		console.log(e);
 		send400(e, res)
-
 	}
+	await tempUser.delete();
+});
+
+// confirm one time password
+app.post('/user/forgot-password/confirm', async (req, res) => {
+	const tempUser = await createTempUser();
+	try {
+		const { username, code } = req.body;
+		if (!(username || '').length || !(code || '').length) {
+			throw 'Код буруу байна';
+		}
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `Bearer ${tempUser.user.jwt}`
+			}
+		});
+		const usersResponse = (await apiClient.get(`/users?username=${username}&resetPasswordCode=${code}&_limit=1`));
+		if (!usersResponse.data.length) {
+			throw 'Код буруу байна';
+		}
+
+		const user = usersResponse.data[0];
+		// хугацаа шалгах
+		const now = moment(new Date());
+		const due = moment(user.resetPasswordTokenIssuedAt);
+		const delta = moment.duration(now.diff(due));
+		if (delta.asMinutes() > PASSWORD_RESET_VALID_MINUTES) {
+			throw 'Кодын хүчинтэй хугацаа дууссан байна';
+		}
+		const resetPasswordToken = randToken.generate(32);
+		await apiClient.put(`/users/${user.id}`, {
+			resetPasswordToken,
+			resetPasswordCode: null,
+			resetPasswordTokenIssuedAt: moment(new Date()).format('YYYY-MM-DD HH:mm:ss')
+		})
+		if (user) {
+			send200({ token: resetPasswordToken }, res);
+		}
+	} catch (e) {
+		console.log(e);
+		send400(e, res);
+	}
+	await tempUser.delete();
 });
 
 // password reset callback
-app.get('/user/forgot-password/reset', async (req, res) => {
-
+app.post('/user/forgot-password/reset', async (req, res) => {
+	const tempUser = await createTempUser();
 	try {
 		const { token, username, password } = req.body;
 		if (!token || !username || !password) {
@@ -124,7 +172,6 @@ app.get('/user/forgot-password/reset', async (req, res) => {
 			send400('3 -с олон тэмдэгт ашиглана уу', res);
 			return
 		}
-		const tempUser = await createTempUser();
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
@@ -134,15 +181,18 @@ app.get('/user/forgot-password/reset', async (req, res) => {
 
 		const userResponse = await apiClient.get(`/users?resetPasswordToken=${token}&username=${username}`);
 		const user = userResponse.data.length ? userResponse.data[0] : null;
+		if (!user?.id) {
+			throw 'invalid token';
+		}
+		// code validated successfully
+
+		// update password and cleanup
 		const userUpdateResponse = await apiClient.put(`/users/${user.id}`, {
 			password,
-			resetPasswordToken: null
+			resetPasswordToken: null,
+			resetPasswordTokenIssuedAt: null
 		})
-		if (user) {
-			res.send(userUpdateResponse.data)
-		} else {
-			send400('invalid token', res)
-		}
+		res.send(userUpdateResponse.data);
 	} catch (e) {
 		console.log(e);
 		send400(e, res);

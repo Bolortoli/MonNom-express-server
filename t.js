@@ -1,5 +1,8 @@
-import randomEmail from 'random-email';
+import moment from 'moment';
 
-for (let i = 0; i < 10; i++) {
-    console.log(randomEmail({ domain: 'example.com' }))
-}
+const now = moment('2021-06-18 12:12:00')
+const issuedAt = moment('2021-06-18 12:01:00');
+const delta = moment.duration(now.diff(issuedAt));
+const minutes = delta.asMinutes();
+
+console.log(minutes)
