@@ -1647,7 +1647,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 		};
 
 		let audio_books = await axios({
-			url: `${STRAPI_URL}/book-audios?book.id=${req.params.book_id}`,
+			url: `${STRAPI_URL}/book-audios?book.id=${req.params.book_id}&_sort=number:ASC`,
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${req.headers.authorization}`,
