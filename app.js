@@ -722,12 +722,12 @@ app.get("/settings-page", async (req, res) => {
 });
 
 // List of employees
-app.get("/all-admins-list", async (req, res) => {
+app.get("/all-admins-list", (req, res) => {
 	// console.log(req);
-	await axios({ url: `${STRAPI_URL}/users`, method: "GET", headers: { Authorization: req.headers.authorization } })
+	axios({ url: `${STRAPI_URL}/users?user_role=1&user_role=2&user_role=3&user_role=4&user_role=5`, method: "GET" })
 		.then((response) => {
-			let sendData = response.data.filter((data) => data.user_role == 1 || data.user_role == 2 || data.user_role == 3 || data.user_role == 4 || data.user_role == 5);
-			send200(sendData, res);
+			console.log(response.data.map((d) => d.user_role));
+			send200(response.data, res);
 		})
 		.catch((err) => {
 			console.log(err);
@@ -1433,9 +1433,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 	// console.log(req.headers);
 	try {
-		let responseData = {
-			chapters: [],
-		};
+		let responseData = { chapters: [] };
 
 		let audio_books = await axios({
 			url: `${STRAPI_URL}/book-audios?book.id=${req.params.book_id}`,
@@ -1450,13 +1448,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 		audio_books = audio_books.data;
 
 		responseData.chapters = audio_books.map((book) => {
-			return {
-				id: book.id,
-				duration: book.audio_duration,
-				chapter_name: book.chapter_name,
-				chapter_number: book.number,
-				audioFile: resolveURL(book.mp3_file?.url),
-			};
+			return { id: book.id, duration: book.audio_duration, chapter_name: book.chapter_name, chapter_number: book.number, audioFile: resolveURL(book.mp3_file?.url) };
 		});
 		// console.log(responseData);
 		send200({ responseData }, res);
@@ -1478,9 +1470,7 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 		let saved_podcasts = await axios({
 			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.params.channel_id}`,
 			method: "GET",
-			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
-			},
+			headers: { Authorization: `Bearer ${req.headers.authorization}` },
 		}).catch((err) => {
 			throw "Failed to fetch user saved podcasts";
 		});
