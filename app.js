@@ -4,12 +4,20 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import multer from "multer";
 import dotenv from "dotenv";
+import faker from 'faker';
+import moment from 'moment';
+import randToken from 'rand-token';
+import randomatic from 'randomatic';
+
+
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 const STRAPI_URL = "https://strapi.monnom.mn";
+const EXPRESS_URL = 'https://express.monnom.mn';
+// const EXPRESS_URL = 'http://localhost:3000';
 
 // For OTP
 const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
@@ -26,6 +34,8 @@ const PAYMENT_EBOOK_MAGIC_WORD = "ebook";
 const PAYMENT_AUDIO_BOOK_MAGIC_WORD = "audio-book";
 const PAYMENT_BOOK_MAGIC_WORD = "book";
 
+const PASSWORD_RESET_VALID_MINUTES = 1;
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -39,13 +49,186 @@ const fileStorageEngine = multer.diskStorage({
 	},
 });
 
-const upload = multer({ storage: fileStorageEngine });
-
-// ----------------------------- PAYEMNT APIs -----------------------------
-
 const resolveURL = (url) => {
 	return (url || "").startsWith("/") ? `${STRAPI_URL}${url}` : url;
 };
+
+const fakeEmail = () => {
+	return `guest${create_temp_unique_text('xxxxxxxxxxxxx')}@monnomguest.com`;
+}
+
+const upload = multer({ storage: fileStorageEngine });
+
+// temp user
+const createTempUser = async () => {
+	const email = fakeEmail();
+	const username = `Temp ${faker.name.lastName()}`;
+	const password = faker.internet.password();
+	const userCreateResponse = await axios.post(`${STRAPI_URL}/auth/local/register`, {
+		username,
+		email,
+		password
+	});
+	const user = userCreateResponse.data;
+	return {
+		user,
+		delete: async () => {
+			return axios.delete(`${STRAPI_URL}/users/${user.user.id}`, {
+				headers: {
+					Authorization: `Bearer ${user.jwt}`
+				}
+			});
+		}
+	}
+}
+
+// guest
+const createGuest = async ({ fcm_token }) => {
+	const email = fakeEmail();
+	const username = email;
+	const password = faker.internet.password();
+	const fullname = `Guest ${faker.name.lastName()}`;
+
+	const createResponse = await axios.post(`${STRAPI_URL}/auth/local/register`, {
+		username,
+		email,
+		fullname,
+		password,
+		is_guest: true,
+		fcm_token,
+		birthday: moment('2000-01-01 00:00:00').format('YYYY-MM-DD HH:mm:ss'),
+		gender: 'Male',
+		phone: faker.phone.phoneNumber()
+	});
+	const user = createResponse.data;
+	return user;
+}
+
+// send password reset url
+app.post('/user/forgot-password', async (req, res) => {
+	const tempUser = await createTempUser();
+	try {
+		const { username } = req.body;
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `Bearer ${tempUser.user.jwt}`
+			}
+		});
+		const userToResetPwdResponse = await apiClient.get(`/users?username=${username}&_limit=1`);
+		if (!userToResetPwdResponse.data.length) {
+			throw 'no user found'
+		} else {
+			const user = userToResetPwdResponse.data[0];
+			const resetPasswordCode = randomatic('0', 6); // n random digits
+			const codeSentAt = moment.utc().format('YYYY-MM-DD HH:mm:ss');
+			const resetPasswordCodeResponse = await apiClient.put(`/users/${user.id}`, {
+				resetPasswordCode,
+				resetPasswordToken: null,
+				resetPasswordTokenIssuedAt: codeSentAt
+			});
+			await axios({
+				url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom: tanii neg udaagiin nuuts kod: ${resetPasswordCode}`,
+				method: "GET",
+			})
+			send200({
+				codeSentAt,
+				minutes: PASSWORD_RESET_VALID_MINUTES,
+				// resetPasswordCode
+			}, res);
+		}
+	} catch (e) {
+		console.log(e);
+		send400(e, res)
+	}
+	await tempUser.delete();
+});
+
+// confirm one time password
+app.post('/user/forgot-password/confirm', async (req, res) => {
+	const tempUser = await createTempUser();
+	try {
+		const { username, code } = req.body;
+		if (!(username || '').length || !(code || '').length) {
+			throw 'Код буруу байна';
+		}
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `Bearer ${tempUser.user.jwt}`
+			}
+		});
+		const usersResponse = (await apiClient.get(`/users?username=${username}&resetPasswordCode=${code}&_limit=1`));
+		if (!usersResponse.data.length) {
+			throw 'Код буруу байна';
+		}
+
+		const user = usersResponse.data[0];
+		// хугацаа шалгах
+		const now = moment.utc();
+		const due = moment(user.resetPasswordTokenIssuedAt);
+		const delta = moment.duration(now.diff(due));
+		if (delta.asMinutes() > PASSWORD_RESET_VALID_MINUTES) {
+			throw 'Кодын хүчинтэй хугацаа дууссан байна';
+		}
+		const resetPasswordToken = randToken.generate(32);
+		await apiClient.put(`/users/${user.id}`, {
+			resetPasswordToken,
+			resetPasswordCode: null,
+			resetPasswordTokenIssuedAt: moment.utc().format('YYYY-MM-DD HH:mm:ss')
+		})
+		if (user) {
+			send200({ token: resetPasswordToken }, res);
+		}
+	} catch (e) {
+		console.log(e);
+		send400(e, res);
+	}
+	await tempUser.delete();
+});
+
+// password reset callback
+app.post('/user/forgot-password/reset', async (req, res) => {
+	const tempUser = await createTempUser();
+	try {
+		const { token, username, password } = req.body;
+		if (!token || !username || !password) {
+			send400('Мэдээлэл дутуу', res);
+			return
+		}
+		if ((password || '').length < 4) {
+			send400('3 -с олон тэмдэгт ашиглана уу', res);
+			return
+		}
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `Bearer ${tempUser.user.jwt}`
+			}
+		});
+
+		const userResponse = await apiClient.get(`/users?resetPasswordToken=${token}&username=${username}`);
+		const user = userResponse.data.length ? userResponse.data[0] : null;
+		if (!user?.id) {
+			throw 'invalid token';
+		}
+		// code validated successfully
+
+		// update password and cleanup
+		const userUpdateResponse = await apiClient.put(`/users/${user.id}`, {
+			password,
+			resetPasswordToken: null,
+			resetPasswordTokenIssuedAt: null
+		})
+		res.send(userUpdateResponse.data);
+	} catch (e) {
+		console.log(e);
+		send400(e, res);
+	}
+	await tempUser.delete();
+});
+
+// ----------------------------- PAYEMNT APIs -----------------------------
 
 app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	try {
@@ -80,11 +263,24 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 
 		qpay_access = qpay_access.data;
 		book = book.data;
-		let order_destination = req.body.order_destination;
-		if (order_destination) {
-			order_destination = order_destination.replaceAll(" ", "+");
+		let delivery;
+		if (req.params.payment_type === 'book') {
+			const deliveryCreateResponse = await axios({
+				url: `${STRAPI_URL}/delivery-registrations`,
+				method: 'POST',
+				data: {
+					order_destination: req.body.order_destination,
+					customer: req.body.user_id,
+					is_paid: false
+				},
+				headers: {
+					Authorization: `Bearer ${req.headers.authorization}`
+				}
+			});
+			delivery = deliveryCreateResponse.data;
 		}
-		let callback_url = `https://express.monnom.mn/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${order_destination}`;
+
+		let callback_url = `${EXPRESS_URL}/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${delivery?.id}`
 		callback_url = callback_url.substr(0, Math.min(2048, callback_url.length));
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
@@ -93,7 +289,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			invoice_description: `Monnom - ${req.body.book_name} төлбөр.`,
 			amount: null,
 			callback_url,
-			// callback_url: `https://express.monnom.mn/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
+			// callback_url: `${EXPRESS_URL}/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
 		};
 
 		switch (req.params.payment_type) {
@@ -124,39 +320,27 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			throw "Invoice creation failed";
 		});
 
+		const paymenCreatePayload = {
+			users_permissions_user: req.body.user_id,
+			payment_amount: book.online_book_price,
+			is_approved: false,
+			book_payment_type: req.params.payment_type,
+			book: req.body.book_id,
+			invoice_id: tempInvoiceId,
+			callback_url
+		}
+		console.log(paymenCreatePayload);
 		const paymentCreateResponse = await axios({
 			method: "POST",
 			url: `${STRAPI_URL}/payments`,
 			headers: {
 				Authorization: `Bearer ${req.headers.authorization}`,
 			},
-			data: {
-				users_permissions_user: req.body.user_id,
-				payment_amount: book.online_book_price,
-				is_approved: false,
-				book_payment_type: req.params.payment_type,
-				book: req.body.book_id,
-				invoice_id: tempInvoiceId,
-			},
+			data: paymenCreatePayload,
 		}).catch(() => {
 			throw "Save payment failed";
 		});
 		const payment = paymentCreateResponse.data;
-
-		// if (req.params.payment_type === 'book') {
-		// 	const deliveryCreateResponse = await axios({
-		// 		url: `${STRAPI_URL}/delivery-registration`,
-		// 		method: 'POST',
-		// 		data: {
-		// 			order_destination: req.body.order_destination,
-		// 			customer_paid_book: req.body.payment.id,
-		// 			customer: req.body.user_id,
-		// 		},
-		// 		headers: {
-		// 			Authorization: `Bearer ${req.headers.authorization}`
-		// 		}
-		// 	});
-		// }
 
 		// hide invoice_id from client so that they can't hack it
 		let response_data = { ...qpay_invoice_creation.data };
@@ -169,9 +353,10 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_address?", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_id?", async (req, res, next) => {
+
 	// callback validation
-	if (req.params.payment_collection_name !== "customer-paid-books") {
+	if (['customer-paid-books', 'customer-paid-ebooks', 'customer-paid-audio-books'].indexOf(req.params.payment_collection_name) == -1) {
 		send400({ error: "Wrong Collection" }, res);
 		return;
 	}
@@ -213,25 +398,19 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			});
 
 		// create delivery
-		if (req.params.delivery_address) {
-			let delivery_address = req.params.delivery_address.replaceAll("+", " ");
+		if (req.params.delivery_id) {
 			try {
-				await apiClient.post(
-					`/delivery-registrations`,
-					{
-						customer_paid_book: bookPaymentResponse.data.id,
-						customer: paymentUpdateResponse.users_permissions_user.id,
-						order_destination: delivery_address,
-					},
-					{
-						headers: {
-							Authorization: `Bearer ${req.params.auth_token}`,
-						},
+				await apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, {
+					is_paid: true
+				}, {
+					headers: {
+						Authorization: `Bearer ${req.params.auth_token}`
 					}
-				);
+				});
 			} catch (e) {
-				console.log("Delivery create failed");
+				console.log('Delivery put failed');
 			}
+
 		}
 
 		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
@@ -241,7 +420,22 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			url: "https://fcm.googleapis.com/fcm/send",
 			method: "POST",
 			headers: { Authorization: `key=${process.env.FCM_SERVER_KEY}` },
-			data: { registration_ids: [fcmToken], channel_id: "fcm_default_channel", notification: { title: "Төлбөр амжилттай", body: "" }, data: { title: "Төлбөр амжилттай", body: "", book_id: paymentUpdateResponse.book.id, type: "book_payment" } },
+			data: {
+				registration_ids: [fcmToken],
+				channel_id: "notifee_channel1",
+				notification: { title: "Төлбөр амжилттай", body: "" },
+				data: {
+					title: "Төлбөр амжилттай",
+					body: "",
+					book_id: paymentUpdateResponse.book.id,
+					type: "book_payment",
+					content_available: true
+				},
+				android: {
+					"priority": "HIGH"
+				},
+
+			},
 		}).catch((err) => {
 			console.log(err);
 			throw "Failed to send notification";
@@ -884,6 +1078,21 @@ app.get("/all-books-list", async (req, res) => {
 
 // ----------------------------- APP APIs -----------------------------
 
+// guest login
+// app.post('/app/guest/login', async (req, res) => {
+
+// });
+
+app.post('/app/guest/signup', async (req, res) => {
+	try {
+		const guest = await createGuest({ fcm_token: req.body?.fcm_token });
+		send200(guest, res);
+	} catch (e) {
+		console.log(e);
+		send400('Error creating guest', res);
+	}
+});
+
 // Unsave podcast channel
 app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 	try {
@@ -1037,7 +1246,7 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 					differce -= parseInt(audio.audio_duration);
 				}
 			});
-		} catch (error) {}
+		} catch (error) { }
 
 		responseData.episodes = channel_audio.map((episode) => {
 			return {
@@ -1240,7 +1449,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			});
 		});
 
-		if (special_book.book != null)
+		if (special_book?.book != null)
 			responseData.specialBook = {
 				id: special_book.book?.id,
 				picture: resolveURL(special_book.book?.picture?.url),
@@ -1436,7 +1645,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 		let responseData = { chapters: [] };
 
 		let audio_books = await axios({
-			url: `${STRAPI_URL}/book-audios?book.id=${req.params.book_id}`,
+			url: `${STRAPI_URL}/book-audios?book.id=${req.params.book_id}&_sort=number:ASC`,
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${req.headers.authorization}`,
@@ -1578,8 +1787,8 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			audioChapters:
 				is_paid_audio_book && book.has_audio
 					? book.book_audios?.map((chapter) => {
-							return { id: chapter.id, name: chapter.chapter_name, duration: chapter.audio_duration, number: chapter.number };
-					  })
+						return { id: chapter.id, name: chapter.chapter_name, duration: chapter.audio_duration, number: chapter.number };
+					})
 					: null,
 		};
 
