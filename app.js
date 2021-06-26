@@ -748,7 +748,9 @@ app.get("/podcast-channels/:id", async (req, res) => {
 app.delete("/podcast/:id", async (req, res) => {
 	axios
 		.delete(`${STRAPI_URL}/podcast-episodes/${req.params.id}`, {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`,
+			}
 		})
 		.then((response) => {
 			console.log(response.data);
