@@ -322,7 +322,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 
 		const paymenCreatePayload = {
 			users_permissions_user: req.body.user_id,
-			payment_amount: book.online_book_price,
+			payment_amount: data.amount,
 			is_approved: false,
 			book_payment_type: req.params.payment_type,
 			book: req.body.book_id,
