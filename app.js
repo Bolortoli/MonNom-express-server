@@ -280,8 +280,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			delivery = deliveryCreateResponse.data;
 		}
 
-		let callback_url = `${EXPRESS_URL}/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${delivery?.id}`
-		callback_url = callback_url.substr(0, Math.min(2048, callback_url.length));
+		let callback_url = `${EXPRESS_URL}/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${delivery?.id || 0}`
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
 			sender_invoice_no: tempInvoiceId,
