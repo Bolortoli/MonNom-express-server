@@ -261,6 +261,12 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			throw "Fetch book failed";
 		});
 
+		// get user data
+		let user = await axios({ method: "GET", url: `${STRAPI_URL}/users/${req.body.user_id}`, headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+			throw "Fetch user failed";
+		});
+		user = user.data;
+
 		qpay_access = qpay_access.data;
 		book = book.data;
 		let delivery;
@@ -281,14 +287,14 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		}
 
 		let callback_url = `${EXPRESS_URL}/payment/payment-callback/${tempInvoiceId}/${model_name}/${delivery?.id || 0}`
+		let paymentDescription = `Monnom - ${req.body.book_name} ${user.username}`
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
 			sender_invoice_no: tempInvoiceId,
 			invoice_receiver_code: req.body.user_id.toString(),
-			invoice_description: `Monnom - ${req.body.book_name} төлбөр.`,
+			invoice_description: paymentDescription,
 			amount: null,
 			callback_url,
-			// callback_url: `${EXPRESS_URL}/payment-callback/${tempInvoiceId}/${model_name}/${req.body.book_id}`,
 		};
 
 		switch (req.params.payment_type) {
@@ -324,6 +330,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			payment_amount: data.amount,
 			is_approved: false,
 			book_payment_type: req.params.payment_type,
+			description: paymentDescription,
 			book: req.body.book_id,
 			invoice_id: tempInvoiceId,
 			callback_url
