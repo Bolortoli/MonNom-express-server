@@ -1026,19 +1026,16 @@ app.get("/podcast-channels", async (req, res) => {
 // List of app users
 app.get("/all-app-users", async (req, res) => {
 	await axios({
-		url: `${STRAPI_URL}/users`,
+		url: `${STRAPI_URL}/users?user_role=6`,
 		method: "GET",
 		headers: {
 			Authorization: `Bearer ${req.headers.authorization}`,
 		},
 	})
 		.then((response) => {
-			let sendData = response.data.filter((data) => data.user_role == 6);
-			send200(sendData, res);
-			// res.send(sendData);
+			send200(response.data, res);
 		})
 		.catch((err) => {
-			// console.log(err);
 			send400("error", res);
 		});
 });
