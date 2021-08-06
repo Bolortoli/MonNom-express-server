@@ -295,7 +295,8 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 				data: {
 					order_destination: req.body.order_destination,
 					customer: req.body.user_id,
-					is_paid: false
+					is_paid: false,
+					is_delivered: false,
 				},
 				headers: {
 					Authorization: `Bearer ${req.headers.authorization}`
@@ -448,6 +449,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 			send400('NOT_PAID', res);
 			return;
 		}
+		console.log('paid');
 
 		// give permission to user
 		paymentUpdateResponse = paymentUpdateResponse.data;
@@ -461,19 +463,19 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 				throw "Failed to save on collection name";
 			});
 
-		// create delivery
+		// update delivery
 		if (parseInt(req.params.delivery_id)) {
 			try {
 				await apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, {
-					is_paid: true
-				}, {
-					headers: {
-						Authorization: `Bearer ${req.params.auth_token}`
-					}
+					is_paid: true,
+					customer_paid_book: bookPaymentResponse.data.id
 				});
 			} catch (e) {
 				console.log('Delivery put failed');
 			}
+		} else {
+			console.log('no delivery')
+			console.log(req.params.delivery_id)
 		}
 
 		// send notification
@@ -501,6 +503,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 
 			},
 		}).catch((err) => {
+			console.log('notification error');
 			console.log(err);
 			throw "Failed to send notification";
 		});
