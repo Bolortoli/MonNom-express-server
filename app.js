@@ -280,7 +280,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			delivery = deliveryCreateResponse.data;
 		}
 
-		let callback_url = `${EXPRESS_URL}/payment/payment-callback/${tempInvoiceId}/${model_name}/${req.headers.authorization}/${delivery?.id || 0}`
+		let callback_url = `${EXPRESS_URL}/payment/payment-callback/${tempInvoiceId}/${model_name}/${delivery?.id || 0}`
 		let data = {
 			invoice_code: QPAY_MERCHANT_INVOICE_NAME,
 			sender_invoice_no: tempInvoiceId,
@@ -366,7 +366,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	}
 });
 
-app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_token/:delivery_id?", async (req, res, next) => {
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:delivery_id?", async (req, res, next) => {
 
 	// callback validation
 	if (['customer-paid-books', 'customer-paid-ebooks', 'customer-paid-audio-books'].indexOf(req.params.payment_collection_name) == -1) {
@@ -375,10 +375,19 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 	}
 
 	try {
+		const tempAuthResponse = await axios({
+			url: `${STRAPI_URL}/auth/local`,
+			method: 'POST',
+			data: {
+				identifier: 'qpaytempuser@qpaytempuser.com',
+				password: 'qpaytempuser'
+			}
+		})
+		const tempAuthJwt = tempAuthResponse.data.jwt;
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
-				Authorization: `Bearer ${req.params.auth_token}`,
+				Authorization: `Bearer ${tempAuthJwt}`,
 			},
 		});
 		const invoice_id = req.params.invoice_id;
@@ -411,7 +420,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			});
 
 		// create delivery
-		if (req.params.delivery_id) {
+		if (parseInt(req.params.delivery_id)) {
 			try {
 				await apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, {
 					is_paid: true
@@ -423,7 +432,6 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:auth_to
 			} catch (e) {
 				console.log('Delivery put failed');
 			}
-
 		}
 
 		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
