@@ -340,7 +340,21 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		}).catch(() => {
 			throw "Save payment failed";
 		});
-		const payment = paymentCreateResponse.data;
+
+		// save qpay invoice id
+		const paymentId = paymentCreateResponse.data.id;
+		const qpayInvoiceId = qpay_invoice_creation.data.invoice_id;
+		
+		await axios({
+			url: `${STRAPI_URL}/payments/${paymentId}`,
+			method: 'PUT',
+			data: {
+				qpay_invoice_id: qpayInvoiceId
+			},
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`
+			}
+		})
 
 		// hide invoice_id from client so that they can't hack it
 		let response_data = { ...qpay_invoice_creation.data };
