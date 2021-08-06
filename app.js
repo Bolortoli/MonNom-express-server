@@ -26,6 +26,7 @@ const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
 const QPAY_MERCHANT_USERNAME = "HAN_AQUA";
 const QPAY_MERCHANT_PASSWORD = "UOaod0R9";
 const QPAY_MERCHANT_INVOICE_NAME = "HANAQUA_INVOICE";
+const QPAY_BASE_URL = "https://merchant.qpay.mn/v2";
 const QPAY_MERCHANT = "https://merchant.qpay.mn/v2/invoice";
 const QPAY_MERCHANT_AUTHENTICATION = "https://merchant.qpay.mn/v2/auth/token";
 
@@ -102,6 +103,23 @@ const createGuest = async ({ fcm_token }) => {
 	});
 	const user = createResponse.data;
 	return user;
+}
+
+// get qpay client
+async function getQpayClient(){
+	try{
+		const qpayAuthResponse = await axios({ method: "POST", url: QPAY_MERCHANT_AUTHENTICATION, auth: { username: QPAY_MERCHANT_USERNAME, password: QPAY_MERCHANT_PASSWORD } });
+		const qpayClient = axios.create({
+			baseURL: QPAY_BASE_URL,
+			headers: {
+				Authorization: `Bearer ${qpayAuthResponse.data.access_token}`
+			}
+		});
+		return qpayClient
+	}catch(e){
+		console.log(e);
+		throw "QPAY authorization failed";
+	}
 }
 
 // send password reset url
@@ -404,18 +422,35 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 
 		paymentResponse = paymentResponse.data[0];
 
+		// check qpay payment
+		const qpayInvoiceId = paymentResponse.qpay_invoice_id
+		const qpayClient = await getQpayClient();
+		const qpayPaymentCheckResponse = await qpayClient.post('/payment/check', {
+			"object_type": "INVOICE",
+			"object_id"  : qpayInvoiceId
+		})
+		const paidRow = qpayPaymentCheckResponse.data.rows.find((row) => row.payment_status === 'PAID');
+		const isPaid = paidRow != undefined;
+		const paidAmount = qpayPaymentCheckResponse.data.paid_amount
 		let paymentUpdateResponse;
 		try {
 			paymentUpdateResponse = await apiClient.put(`/payments/${paymentResponse.id}`, {
-				is_approved: true,
+				is_approved: isPaid,
+				paid_amount: paidAmount,
 				payment_data: JSON.stringify(req.body || {}) + "get",
 			});
 		} catch (e) {
 			throw "Payment update failed";
 		}
+		
+		// check payment before grant book
+		if (!isPaid){
+			send400('NOT_PAID', res);
+			return;
+		}
 
+		// give permission to user
 		paymentUpdateResponse = paymentUpdateResponse.data;
-
 		const bookPaymentResponse = await apiClient
 			.post(`/${req.params.payment_collection_name}`, {
 				book: paymentUpdateResponse.book.id,
@@ -441,6 +476,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 			}
 		}
 
+		// send notification
 		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
 		const user = userResponse.data[0];
 		const fcmToken = user?.fcm_token;
