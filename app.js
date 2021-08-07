@@ -1829,8 +1829,14 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0 || (book?.audio_book_price || 0) == 0;
 
 		let absPdfPath = "";
+		let absEpubPath = "";
+		let isPdf = false;
+		let isEpub = false;
 		if (is_paid_ebook) {
+			isPdf = book?.is_ebook_pdf
+			isEpub = book?.is_ebook_epub
 			absPdfPath = resolveURL(book?.pdf_book_path?.url);
+			absEpubPath = resolveURL(book?.epub_book_path.url);
 		}
 		responseData.book = {
 			id: book.id,
@@ -1850,6 +1856,9 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			is_paid_ebook,
 			is_paid_audio_book,
 			pdfPath: absPdfPath,
+			epubPath: absEpubPath,
+			isEpub: isEpub,
+			isPdf: isPdf,
 			audioChapters:
 				is_paid_audio_book && book.has_audio
 					? book.book_audios?.map((chapter) => {
