@@ -1836,7 +1836,8 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			isPdf = book?.is_ebook_pdf
 			isEpub = book?.is_ebook_epub
 			absPdfPath = resolveURL(book?.pdf_book_path?.url);
-			absEpubPath = resolveURL(book?.epub_book_path.url);
+			absEpubPath = resolveURL(book?.epub_book_path?.url);
+			console.log(book?.epub_book_path?.url)
 		}
 		responseData.book = {
 			id: book.id,
@@ -1882,6 +1883,8 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		send200({ responseData }, res);
 	} catch (error) {
+		console.log('ERROR')
+		console.log(error);
 		send400(error, res);
 	}
 });
