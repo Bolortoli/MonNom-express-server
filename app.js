@@ -1584,11 +1584,13 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 
 		saved_podcasts.map((channel) => {
 			if (responseData.savedPodcastChannels.filter((searchChannel) => searchChannel.id == channel.podcast_channel.id).length == 0) {
-				responseData.savedPodcastChannels.push({
-					id: channel.podcast_channel?.id,
-					name: channel.podcast_channel?.name,
-					picture: resolveURL(channel.podcast_channel?.cover_pic?.url),
-				});
+				if (channel.podcast_channel?.id){
+					responseData.savedPodcastChannels.push({
+						id: channel.podcast_channel?.id,
+						name: channel.podcast_channel?.name,
+						picture: resolveURL(channel.podcast_channel?.cover_pic?.url),
+					});
+				}
 			}
 		});
 
