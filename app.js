@@ -1529,7 +1529,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 });
 
 app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
-	try {
+	// try {
 		let responseData = {
 			savedPodcastChannels: [],
 			latestPodcasts: [],
@@ -1602,12 +1602,13 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 		});
 
 		latest_podcasts.forEach((podcast) => {
-			responseData.latestPodcasts.push({
-				id: podcast.id,
-				name: podcast.episode_name,
-				picture: resolveURL(podcast.picture?.url),
-				channel_id: podcast.podcast_channel.id,
-			});
+			if (podcast.podcast_channel)
+				responseData.latestPodcasts.push({
+					id: podcast.id,
+					name: podcast.episode_name,
+					picture: resolveURL(podcast.picture?.url),
+					channel_id: podcast.podcast_channel?.id,
+				});
 		});
 
 		podcast_categories.forEach((category) => {
@@ -1634,9 +1635,9 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 		});
 
 		send200({ responseData }, res);
-	} catch (error) {
-		send400(error, res);
-	}
+	// } catch (error) {
+	// 	send400(error, res);
+	// }
 });
 
 app.get(`/app/my-library/:user_id`, async (req, res) => {
