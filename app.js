@@ -1692,7 +1692,9 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 
 		boughtBooks.forEach((boughtBook) => {
 			if (responseData.books.filter((searchBook) => searchBook.id == boughtBook.book?.id).length == 0) {
-				responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
+				if (boughtBook.book?.id){
+					responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
+				}
 			}
 		});
 
