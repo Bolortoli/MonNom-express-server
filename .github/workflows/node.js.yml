@@ -46,4 +46,6 @@ jobs:
     # run app
     - run: pm2 delete monnom-express
       continue-on-error: true
+    - run: pm2 save --force
+      continue-on-error: true
     - run: pm2 start start.sh --name monnom-express --exp-backoff-restart-delay=100
