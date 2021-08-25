@@ -1469,7 +1469,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 
 		books.forEach((book) => {
 			if (book.is_featured) {
-				responseData.bestBooks.push({ id: book.id, picture_path: resolveURL(book.picture?.url) });
+				responseData.bestBooks.push({ id: book.id, picture_path: resolveURL(book.featured_picture?.url) });
 			}
 			if (book.has_audio) {
 				let tempAuthorsString = "";
@@ -1518,7 +1518,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 		if (special_book?.book != null)
 			responseData.specialBook = {
 				id: special_book.book?.id,
-				picture: resolveURL(special_book.book?.picture?.url),
+				picture: resolveURL(special_book.book?.featured_picture?.url),
 			};
 
 		send200(responseData, res);
