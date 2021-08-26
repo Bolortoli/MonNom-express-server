@@ -1660,8 +1660,18 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			throw "error1";
 		});
 
-		let boughtBooks = await axios({
+		let boughtEbooks = await axios({
 			url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user.id=${req.params.user_id}`,
+			method: "GET",
+			headers: {
+				Authorization: `Bearer ${req.headers.authorization}`,
+			},
+		}).catch((err) => {
+			throw "error1";
+		});
+
+		let boughtAudioBooks = await axios({
+			url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user.id=${req.params.user_id}`,
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${req.headers.authorization}`,
@@ -1681,7 +1691,8 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 		});
 
 		podcast_channels = podcast_channels.data;
-		boughtBooks = boughtBooks.data;
+		boughtEbooks = boughtEbooks.data;
+		boughtAudioBooks = boughtAudioBooks.data;
 		savedBooks = savedBooks.data;
 
 		podcast_channels.forEach((channel) => {
@@ -1690,7 +1701,15 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 			}
 		});
 
-		boughtBooks.forEach((boughtBook) => {
+		boughtEbooks.forEach((boughtBook) => {
+			if (responseData.books.filter((searchBook) => searchBook.id == boughtBook.book?.id).length == 0) {
+				if (boughtBook.book?.id){
+					responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
+				}
+			}
+		});
+
+		boughtAudioBooks.forEach((boughtBook) => {
 			if (responseData.books.filter((searchBook) => searchBook.id == boughtBook.book?.id).length == 0) {
 				if (boughtBook.book?.id){
 					responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
