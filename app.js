@@ -1791,10 +1791,19 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 	try {
 		let responseData = { book: {}, imageComments: [], comments: [], relatedBooks: [] };
 		let book = await axios({ url: `${STRAPI_URL}/books/${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+			console.log(err)
 			throw "error1";
 		});
 
-		let sales_count = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let ebook_sales_count = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+			throw "error2";
+		});
+
+		let audio_sales_count = await axios({ url: `${STRAPI_URL}/customer-paid-audio-books?book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+			throw "error2";
+		});
+
+		let delivery_sales_count = await axios({ url: `${STRAPI_URL}/customer-paid-books?book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
 			throw "error2";
 		});
 
@@ -1821,7 +1830,11 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 		});
 
 		book = book.data;
-		sales_count = sales_count.data.length;
+		ebook_sales_count = ebook_sales_count.data.length;
+		audio_sales_count = audio_sales_count.data.length;
+		delivery_sales_count = delivery_sales_count.data.length;
+
+		let total_sales_count = ebook_sales_count + audio_sales_count + delivery_sales_count
 
 		let tempAuthorsString = "";
 		book.book_authors.forEach((author, index) => {
@@ -1851,7 +1864,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			eBookPrice: book.online_book_price,
 			bookPrice: book.book_price,
 			audioBookPrice: book.audio_book_price,
-			salesCount: sales_count,
+			salesCount: total_sales_count,
 			hasAudio: book.has_audio,
 			hasPdf: book.has_pdf,
 			hasSale: book.has_sale,
