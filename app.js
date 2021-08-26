@@ -1079,7 +1079,7 @@ app.get("/podcast-channels", async (req, res) => {
 // List of app users
 app.get("/all-app-users", async (req, res) => {
 	await axios({
-		url: `${STRAPI_URL}/users?user_role=6`,
+		url: `${STRAPI_URL}/users?user_role=6&_limit=1000000000`,
 		method: "GET",
 		headers: {
 			Authorization: `Bearer ${req.headers.authorization}`,
