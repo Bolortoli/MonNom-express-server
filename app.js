@@ -8,15 +8,16 @@ import faker from 'faker';
 import moment from 'moment';
 import randToken from 'rand-token';
 import randomatic from 'randomatic';
-
+import jwt from 'express-jwt';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-const STRAPI_URL = "https://strapi.monnom.mn";
-const EXPRESS_URL = 'https://express.monnom.mn';
+// const STRAPI_URL = "https://strapi.monnom.mn";
+const STRAPI_URL = "http://localhost:1337";
+const EXPRESS_URL = 'http://localhost:3000';
 // const EXPRESS_URL = 'http://localhost:3000';
 
 // For OTP
@@ -76,7 +77,7 @@ const createTempUser = async () => {
 		delete: async () => {
 			return axios.delete(`${STRAPI_URL}/users/${user.user.id}`, {
 				headers: {
-					Authorization: `Bearer ${user.jwt}`
+					Authorization: `${user.jwt}`
 				}
 			});
 		}
@@ -112,7 +113,7 @@ async function getQpayClient(){
 		const qpayClient = axios.create({
 			baseURL: QPAY_BASE_URL,
 			headers: {
-				Authorization: `Bearer ${qpayAuthResponse.data.access_token}`
+				Authorization: `${qpayAuthResponse.data.access_token}`
 			}
 		});
 		return qpayClient
@@ -122,6 +123,22 @@ async function getQpayClient(){
 	}
 }
 
+// PUBLIC ENDPOINTS
+
+
+// PRIVATE ENDPOINTS
+
+// app version compatibility
+app.use((req, res, next) => {
+	if (!req.headers.authorization?.toString().startsWith('Bearer')) {
+		req.headers.authorization = `Bearer ${req.headers.authorization}`
+	}
+	console.log(req.headers.authorization)
+	next();
+})
+
+app.use(jwt({ secret: process.env.JWT_SECRET, algorithms: ['HS256'] }));
+
 // send password reset url
 app.post('/user/forgot-password', async (req, res) => {
 	const tempUser = await createTempUser();
@@ -130,7 +147,7 @@ app.post('/user/forgot-password', async (req, res) => {
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
-				Authorization: `Bearer ${tempUser.user.jwt}`
+				Authorization: `${tempUser.user.jwt}`
 			}
 		});
 		const userToResetPwdResponse = await apiClient.get(`/users?username=${username}&_limit=1`);
@@ -173,7 +190,7 @@ app.post('/user/forgot-password/confirm', async (req, res) => {
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
-				Authorization: `Bearer ${tempUser.user.jwt}`
+				Authorization: `${tempUser.user.jwt}`
 			}
 		});
 		const usersResponse = (await apiClient.get(`/users?username=${username}&resetPasswordCode=${code}&_limit=1`));
@@ -221,7 +238,7 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
-				Authorization: `Bearer ${tempUser.user.jwt}`
+				Authorization: `${tempUser.user.jwt}`
 			}
 		});
 
@@ -250,6 +267,7 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 
 app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	try {
+		console.log(`create deeplink`)
 		let model_name;
 
 		switch (req.params.payment_type) {
@@ -275,12 +293,13 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		});
 
 		// For get book price
-		let book = await axios({ method: "GET", url: `${STRAPI_URL}/books/${req.body.book_id}`, headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let book = await axios({ method: "GET", url: `${STRAPI_URL}/books/${req.body.book_id}`,}).catch((err) => {
 			throw "Fetch book failed";
 		});
 
 		// get user data
-		let user = await axios({ method: "GET", url: `${STRAPI_URL}/users/${req.body.user_id}`, headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let user = await axios({ method: "GET", url: `${STRAPI_URL}/users/${req.user.id}`,}).catch((err) => {
+			console.log(`${STRAPI_URL}/users/${req.user.id}`)
 			throw "Fetch user failed";
 		});
 		user = user.data;
@@ -299,7 +318,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 					is_delivered: false,
 				},
 				headers: {
-					Authorization: `Bearer ${req.headers.authorization}`
+					Authorization: `${req.headers.authorization}`
 				}
 			});
 			delivery = deliveryCreateResponse.data;
@@ -318,7 +337,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 
 		switch (req.params.payment_type) {
 			case PAYMENT_EBOOK_MAGIC_WORD:
-				data.amount = book.online_book_price;
+				data.amount;
 				break;
 			case PAYMENT_AUDIO_BOOK_MAGIC_WORD:
 				data.amount = book.audio_book_price;
@@ -330,8 +349,8 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			default:
 				throw "Magic word not founds";
 		}
+		data.amount = data.amount - (data.amount * (book.discount_percent || 0) / 100)
 
-		console.log(data);
 		let qpay_invoice_creation = await axios({
 			method: "POST",
 			url: QPAY_MERCHANT,
@@ -359,7 +378,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			method: "POST",
 			url: `${STRAPI_URL}/payments`,
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 			data: paymenCreatePayload,
 		}).catch(() => {
@@ -377,7 +396,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 				qpay_invoice_id: qpayInvoiceId
 			},
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`
+				Authorization: `${req.headers.authorization}`
 			}
 		})
 
@@ -413,7 +432,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
-				Authorization: `Bearer ${tempAuthJwt}`,
+				Authorization: `${tempAuthJwt}`,
 			},
 		});
 		const invoice_id = req.params.invoice_id;
@@ -540,31 +559,31 @@ app.get("/dashboard", async (req, res) => {
 			mostBoughtPDFBooks: [],
 		};
 
-		let customer_saved_books = await axios({ url: `${STRAPI_URL}/customer-paid-books`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let customer_saved_books = await axios({ url: `${STRAPI_URL}/customer-paid-books`, method: "GET",}).catch((err) => {
 			throw "error saved books";
 		});
 
-		let customer_saved_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let customer_saved_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks`, method: "GET",}).catch((err) => {
 			throw "error saved ebooks";
 		});
 
-		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET",}).catch((err) => {
 			throw "error podcast channels";
 		});
 
-		let podcast_channels_saves = await axios({ url: `${STRAPI_URL}/user-saved-podcasts`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let podcast_channels_saves = await axios({ url: `${STRAPI_URL}/user-saved-podcasts`, method: "GET",}).catch((err) => {
 			throw "error saved podcasts";
 		});
 
-		let totalRadioChannels = await axios({ url: `${STRAPI_URL}/radio-channels/count`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let totalRadioChannels = await axios({ url: `${STRAPI_URL}/radio-channels/count`, method: "GET",}).catch((err) => {
 			throw "error radio";
 		});
 
-		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET",}).catch((err) => {
 			throw "error books";
 		});
 
-		let app_users = await axios({ url: `${STRAPI_URL}/users?user_role=6`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let app_users = await axios({ url: `${STRAPI_URL}/users?user_role=6`, method: "GET",}).catch((err) => {
 			throw "error users";
 		});
 
@@ -677,10 +696,10 @@ app.get("/dashboard", async (req, res) => {
 app.get("/book-add-informations", async (req, res) => {
 	try {
 		let sendData = { available_authors: null, available_categories: null };
-		let authors = await axios({ method: "GET", url: `${STRAPI_URL}/book-authors`, headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let authors = await axios({ method: "GET", url: `${STRAPI_URL}/book-authors`,}).catch((err) => {
 			throw "error-authors";
 		});
-		let categories = await axios({ method: "GET", url: `${STRAPI_URL}/book-categories`, headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let categories = await axios({ method: "GET", url: `${STRAPI_URL}/book-categories`,}).catch((err) => {
 			throw "error-categpries";
 		});
 
@@ -695,7 +714,7 @@ app.get("/book-add-informations", async (req, res) => {
 
 // Information about specific book author all books
 app.get("/book-single-by-author/:id", async (req, res) => {
-	const headers = { Authorization: `Bearer ${req.headers.authorization}` };
+	const headers = { Authorization: `${req.headers.authorization}` };
 	await axios({ url: `${STRAPI_URL}/users/${req.params.id}`, method: "GET", headers: headers })
 		.then(async (response) => {
 			// TODO user data
@@ -775,7 +794,7 @@ app.get("/podcast-channels/:id", async (req, res) => {
 		url: `${STRAPI_URL}/podcast-channels/${req.params.id}`,
 		method: "GET",
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 	})
 		.then((response) => {
@@ -816,7 +835,7 @@ app.delete("/podcast/:id", async (req, res) => {
 	axios
 		.delete(`${STRAPI_URL}/podcast-episodes/${req.params.id}`, {
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			}
 		})
 		.then((response) => {
@@ -832,7 +851,7 @@ app.delete("/podcast/:id", async (req, res) => {
 // Create podcast episode
 app.post("/podcast", upload.single("podcast_episode"), async (req, res) => {
 	await axios
-		.post(`${STRAPI_URL}/podcast-episodes`, formData, { Authorization: `Bearer ${req.headers.authorization}` })
+		.post(`${STRAPI_URL}/podcast-episodes`, formData, { Authorization: `${req.headers.authorization}` })
 		.then(async (res) => {
 			let tempResponse = res.data;
 			let imageData = new FormData();
@@ -845,7 +864,7 @@ app.post("/podcast", upload.single("podcast_episode"), async (req, res) => {
 			imageData.append("source", "users-permissions");
 
 			await axios
-				.post("${STRAPI_URL}/upload", imageData, { Authorization: `Bearer ${req.headers.authorization}` })
+				.post("${STRAPI_URL}/upload", imageData, { Authorization: `${req.headers.authorization}` })
 				.then((res) => {
 					tempResponse.profile_picture = res.data[0];
 				})
@@ -863,7 +882,7 @@ app.post("/create-admin", upload.single("profile_picture"), async (req, res, nex
 	await axios({
 		url: `${STRAPI_URL}/users`,
 		method: "POST",
-		headers: { "content-type": "multipart/form-data", Authorization: `Bearer ${req.headers.authorization}` },
+		headers: { "content-type": "multipart/form-data", Authorization: `${req.headers.authorization}` },
 		body: { username: req.body.username, password: req.body.password, role: 1, phone: req.body.phone, gender: req.body.gender, fullname: req.body.fullname, user_role: req.body.user_role, e_mail: req.body.emailof, email: req.body.emailof },
 	})
 		.then((response) => {
@@ -880,7 +899,7 @@ app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, r
 		url: `${STRAPI_URL}/settings`,
 		method: "PUT",
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 		data: {
 			TermsAndConditions: req.body.terms,
@@ -900,7 +919,7 @@ app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, r
 app.post("/admin-login", async (req, res) => {
 	console.log(req.body);
 	await axios
-		.post(`${STRAPI_URL}/auth/local`, { identifier: req.body.identifier, password: req.body.password }, { Authorization: `Bearer ${req.headers.authorization}` })
+		.post(`${STRAPI_URL}/auth/local`, { identifier: req.body.identifier, password: req.body.password }, { Authorization: `${req.headers.authorization}` })
 		.then((response) => {
 			send200(response.data, res);
 		})
@@ -915,7 +934,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/settings`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -925,7 +944,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/podcast-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -935,7 +954,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error2";
@@ -945,7 +964,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-authors`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
@@ -1001,7 +1020,7 @@ app.get("/all-admins-list", (req, res) => {
 // List of employees who are don't have podcast channel
 app.get("/all-admins-settings", async (req, res) => {
 	// console.log(req);
-	await axios({ url: `${STRAPI_URL}/users?podcast_channel_null=true`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } })
+	await axios({ url: `${STRAPI_URL}/users?podcast_channel_null=true`, method: "GET",})
 		.then((response) => {
 			let sendData = response.data.filter((data) => data.user_role == 1 || data.user_role == 2 || data.user_role == 3 || data.user_role == 4 || data.user_role == 5);
 			send200(sendData, res);
@@ -1020,7 +1039,7 @@ app.post("/update-employee", async (req, res) => {
 	delete body["id"];
 	await axios({
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 		url: `${STRAPI_URL}/users/${id}`,
 		method: "PUT",
@@ -1039,7 +1058,7 @@ app.post("/update-employee", async (req, res) => {
 app.get("/podcast-channels", async (req, res) => {
 	await axios({
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 		url: `${STRAPI_URL}/podcast-channels`,
 		method: "GET",
@@ -1082,7 +1101,7 @@ app.get("/all-app-users", async (req, res) => {
 		url: `${STRAPI_URL}/users?user_role=6&_limit=1000000000`,
 		method: "GET",
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 	})
 		.then((response) => {
@@ -1105,7 +1124,7 @@ app.get("/all-books-list", async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1168,7 +1187,7 @@ app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.body.channel_id}&users_permissions_user=${req.body.user_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1180,7 +1199,7 @@ app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 		});
 
 		console.log(saves);
-		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, { headers: { Authorization: `Bearer ${req.headers.authorization}` } })));
+		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, {})));
 		send200({}, res);
 	} catch (error) {
 		send400("error", res);
@@ -1195,7 +1214,7 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.body.user_id}&book.id=${req.body.book_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1211,7 +1230,7 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			saves.map((podcastRequest) =>
 				axios.delete(podcastRequest, {
 					headers: {
-						Authorization: `Bearer ${req.headers.authorization}`,
+						Authorization: `${req.headers.authorization}`,
 					},
 				})
 			)
@@ -1234,7 +1253,7 @@ app.get("/app/live", async (req, res, next) => {
 		url: `${STRAPI_URL}/radio-channels`,
 		method: "GET",
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 	}).catch((err) => {
 		console.log(err);
@@ -1271,7 +1290,7 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 			url: `${STRAPI_URL}/radio-channels/${req.params.channel_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
@@ -1410,7 +1429,7 @@ app.post("/app/create-user", async (req, res) => {
 });
 
 //
-app.get("/app/books/main/:user_id", async (req, res) => {
+app.get("/app/books/main/:user_id?", async (req, res) => {
 	try {
 		let responseData = {
 			bestBooks: [],
@@ -1423,7 +1442,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			// console.log(err);
@@ -1434,17 +1453,17 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			url: `${STRAPI_URL}/book-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
 		});
 
 		let user_saved_books = await axios({
-			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.params.user_id}`,
+			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
@@ -1455,7 +1474,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 			url: `${STRAPI_URL}/special-book`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
@@ -1528,7 +1547,7 @@ app.get("/app/books/main/:user_id", async (req, res) => {
 	}
 });
 
-app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
+app.get(`/app/podcasts/main/:user_id?`, async (req, res) => {
 	try {
 		let responseData = {
 			savedPodcastChannels: [],
@@ -1541,7 +1560,7 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-channels`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1551,17 +1570,17 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error2";
 		});
 
 		let saved_podcasts = await axios({
-			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.params.user_id}`,
+			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
@@ -1571,7 +1590,7 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-episodes?_sort=created_at:DESC`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
@@ -1642,7 +1661,7 @@ app.get(`/app/podcasts/main/:user_id`, async (req, res) => {
 	}
 });
 
-app.get(`/app/my-library/:user_id`, async (req, res) => {
+app.get(`/app/my-library/:user_id?`, async (req, res) => {
 	try {
 		let responseData = {
 			podcastChannels: [],
@@ -1651,40 +1670,40 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 		};
 
 		let podcast_channels = await axios({
-			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.params.user_id}`,
+			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
 		});
 
 		let boughtEbooks = await axios({
-			url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user.id=${req.params.user_id}`,
+			url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
 		});
 
 		let boughtAudioBooks = await axios({
-			url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user.id=${req.params.user_id}`,
+			url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
 		});
 
 		let savedBooks = await axios({
-			url: `${STRAPI_URL}/user-saved-books?users_permissions_user.id=${req.params.user_id}`,
+			url: `${STRAPI_URL}/user-saved-books?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1729,7 +1748,7 @@ app.get(`/app/my-library/:user_id`, async (req, res) => {
 	}
 });
 
-app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
+app.get(`/app/audio-books/:book_id/:user_id?`, async (req, res) => {
 	// console.log(req.headers);
 	try {
 		let responseData = { chapters: [] };
@@ -1738,7 +1757,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 			url: `${STRAPI_URL}/book-audios?book.id=${req.params.book_id}&_sort=number:ASC`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1756,7 +1775,7 @@ app.get(`/app/audio-books/:book_id/:user_id`, async (req, res) => {
 	}
 });
 
-app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
+app.get(`/app/podcast-channel/:channel_id/:user_id?`, async (req, res) => {
 	try {
 		let responseData = {
 			channel: null,
@@ -1764,12 +1783,10 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 			comments: [],
 		};
 
-		console.log(req.headers);
-
 		let saved_podcasts = await axios({
 			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.params.channel_id}`,
 			method: "GET",
-			headers: { Authorization: `Bearer ${req.headers.authorization}` },
+			headers: { Authorization: `${req.headers.authorization}` },
 		}).catch((err) => {
 			throw "Failed to fetch user saved podcasts";
 		});
@@ -1778,7 +1795,7 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-channels/${req.params.channel_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "Failed to fetch podcast channel";
@@ -1786,7 +1803,7 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 
 		saved_podcasts = saved_podcasts.data;
 		channel = channel.data;
-		let is_saved = saved_podcasts.filter((podcast) => podcast.users_permissions_user.id == req.params.user_id).length != 0;
+		let is_saved = saved_podcasts.filter((podcast) => podcast.users_permissions_user.id == req.user.id).length != 0;
 
 		responseData.channel = { id: channel.id, name: channel.name, description: channel.description, picture: resolveURL(channel.cover_pic?.url), followers: saved_podcasts.length, is_saved };
 
@@ -1806,35 +1823,24 @@ app.get(`/app/podcast-channel/:channel_id/:user_id`, async (req, res) => {
 	}
 });
 
-app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
+app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
+	console.log(req.user)
 	try {
 		let responseData = { book: {}, imageComments: [], comments: [], relatedBooks: [] };
-		let book = await axios({ url: `${STRAPI_URL}/books/${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let book = await axios({ url: `${STRAPI_URL}/books/${req.params.book_id}`, method: "GET",}).catch((err) => {
 			console.log(err)
 			throw "error1";
 		});
 
-		let ebook_sales_count = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let customer_paid_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
 			throw "error2";
 		});
 
-		let audio_sales_count = await axios({ url: `${STRAPI_URL}/customer-paid-audio-books?book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
-			throw "error2";
-		});
-
-		let delivery_sales_count = await axios({ url: `${STRAPI_URL}/customer-paid-books?book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
-			throw "error2";
-		});
-
-		let customer_paid_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
-			throw "error2";
-		});
-
-		let customer_paid_books = await axios({ url: `${STRAPI_URL}/customer-paid-books?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let customer_paid_books = await axios({ url: `${STRAPI_URL}/customer-paid-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
 			throw "error3";
 		});
 
-		let customer_paid_audio_books = await axios({ url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user=${req.params.user_id}&book.id=${req.params.book_id}`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let customer_paid_audio_books = await axios({ url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
 			throw "error3";
 		});
 
@@ -1844,16 +1850,11 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 
 		let related_books = [];
 
-		await axios.all(authorRequests.map((authorRequest) => axios.get(authorRequest, { headers: { Authorization: `Bearer ${req.headers.authorization}` } }))).then((...res) => {
+		await axios.all(authorRequests.map((authorRequest) => axios.get(authorRequest, {}))).then((...res) => {
 			res[0].forEach((r) => r.data.forEach((re) => related_books.push(re)));
 		});
 
 		book = book.data;
-		ebook_sales_count = ebook_sales_count.data.length;
-		audio_sales_count = audio_sales_count.data.length;
-		delivery_sales_count = delivery_sales_count.data.length;
-
-		let total_sales_count = ebook_sales_count + audio_sales_count + delivery_sales_count
 
 		let tempAuthorsString = "";
 		book.book_authors.forEach((author, index) => {
@@ -1861,9 +1862,30 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			else tempAuthorsString += `${author.author_name}  `;
 		});
 
-		let is_paid_book = customer_paid_books.data?.length != 0 || (book?.book_price || 0) == 0;
-		let is_paid_ebook = customer_paid_ebooks.data?.length != 0 || (book?.online_book_price || 0) == 0;
-		let is_paid_audio_book = customer_paid_audio_books.data?.length != 0 || (book?.audio_book_price || 0) == 0;
+		const usedPromos = (await axios({
+			url: `${STRAPI_URL}/users-promo-codes`,
+			method: 'GET',
+			params: {
+				user: req.user.id,
+				book: req.params.book_id,
+				_limit: 1,
+				_sort: 'id:desc'
+			}
+		})).data
+
+		let promoProduct;
+
+		if (usedPromos?.length) {
+			promoProduct = (await axios({
+				url: `${STRAPI_URL}/promo-code-products/${usedPromos[0].promo_code.product}`
+			})).data
+		}
+
+		const discountPercent = promoProduct?.discount_percent || 0
+
+		let is_paid_book = discountPercent > 99 || customer_paid_books.data?.length != 0 || (book?.book_price || 0) == 0;
+		let is_paid_ebook = discountPercent > 99 || customer_paid_ebooks.data?.length != 0 || (book?.online_book_price || 0) == 0;
+		let is_paid_audio_book = discountPercent > 99 || customer_paid_audio_books.data?.length != 0 || (book?.audio_book_price || 0) == 0;
 
 		let absPdfPath = "";
 		let absEpubPath = "";
@@ -1876,6 +1898,9 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			absEpubPath = resolveURL(book?.epub_book_path?.url);
 			console.log(book?.epub_book_path?.url)
 		}
+
+		console.log(promoProduct)
+
 		responseData.book = {
 			id: book.id,
 			picture: resolveURL(book.picture?.url),
@@ -1883,7 +1908,7 @@ app.get(`/app/book/:book_id/:user_id`, async (req, res) => {
 			eBookPrice: book.online_book_price,
 			bookPrice: book.book_price,
 			audioBookPrice: book.audio_book_price,
-			salesCount: total_sales_count,
+			discountPercent: promoProduct?.discount_percent || 0,
 			hasAudio: book.has_audio,
 			hasPdf: book.has_pdf,
 			hasSale: book.has_sale,
@@ -1940,7 +1965,7 @@ app.get(`/app/search/book/audio/:search`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1981,7 +2006,7 @@ app.get(`/app/search/book/audio`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -2012,7 +2037,7 @@ app.get(`/app/search/book/:search`, async (req, res) => {
 	try {
 		let responseData = { books: [] };
 
-		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET",}).catch((err) => {
 			throw "error1";
 		});
 
@@ -2041,7 +2066,7 @@ app.get(`/app/search/book`, async (req, res) => {
 	try {
 		let responseData = { books: [] };
 
-		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET",}).catch((err) => {
 			throw "error1";
 		});
 
@@ -2071,7 +2096,7 @@ app.get(`/app/search/podcast`, async (req, res) => {
 	try {
 		let responseData = { podcast_channels: [] };
 
-		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET",}).catch((err) => {
 			throw "error1";
 		});
 
@@ -2095,7 +2120,7 @@ app.get(`/app/search/podcast/:search`, async (req, res) => {
 	try {
 		let responseData = { podcast_channels: [] };
 
-		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET", headers: { Authorization: `Bearer ${req.headers.authorization}` } }).catch((err) => {
+		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET",}).catch((err) => {
 			throw "error1";
 		});
 
@@ -2114,6 +2139,63 @@ app.get(`/app/search/podcast/:search`, async (req, res) => {
 		send400(error, res);
 	}
 });
+
+// POST
+app.post('/app/promo', async (req, res) => {
+
+	const promoCode = req.body.promoCode;
+	const bookId = req.body.bookId;
+
+	const foundPromoCodes = (await axios({
+		url: `${STRAPI_URL}/promo-codes`,
+		method: 'GET',
+		params: {
+			code: promoCode,
+			_sort: 'id:desc',
+			_limit: 1
+		}
+	})).data
+	if (!foundPromoCodes?.length) {
+		console.log('promo code not found')
+		return res.status(400).send({message: 'Промо код олдсонгүй'})
+	}
+	const usedPromoCodeResponse = (await axios({ 
+		url: `${STRAPI_URL}/users-promo-codes`,
+		method: "GET",
+		params: {
+			'promo_code.code': promoCode,
+			_limit: 1
+		} })).data;
+	if (usedPromoCodeResponse?.length) {
+		return res.status(400).send({message: 'Промо код хэрэглэгдсэн байна'})
+	}
+
+	// validate promo end date
+	const promoProduct = (await axios({
+		url: `${STRAPI_URL}/promo-code-products/${foundPromoCodes[0].product.id}`
+	})).data
+
+	if (moment().isAfter(moment(promoProduct.end_date))) {
+		return res.status(400).send({message: 'Промо кодын хугацаа дууссан байна'})
+	}
+	try {
+		const writeResponse = await axios({
+			url: `${STRAPI_URL}/users-promo-codes`, 
+			method: 'POST', 
+			data: {
+				promo_code: foundPromoCodes[0].id,
+				'book': bookId,
+				'user': req.user.id
+			}})
+		console.log(writeResponse.data)
+		res.send({
+			message: 'success'
+		})
+	} catch(e) {
+		console.log(e)
+		res.status(400).send({mesasge: `Промо код олдсонгүй`})
+	}
+})
 
 // ----------------------------- UTILITY FUNCTIONs -----------------------------
 
