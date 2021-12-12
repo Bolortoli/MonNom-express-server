@@ -143,7 +143,6 @@ app.use((req, res, next) => {
 	if (!req.headers.authorization?.toString().startsWith('Bearer')) {
 		req.headers.authorization = `Bearer ${req.headers.authorization}`
 	}
-	console.log(req.headers.authorization)
 	next();
 })
 
@@ -277,7 +276,6 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 
 app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 	try {
-		console.log(`create deeplink`)
 		let model_name;
 
 		switch (req.params.payment_type) {
@@ -344,10 +342,9 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			amount: null,
 			callback_url,
 		};
-
 		switch (req.params.payment_type) {
 			case PAYMENT_EBOOK_MAGIC_WORD:
-				data.amount;
+				data.amount = book.online_book_price;
 				break;
 			case PAYMENT_AUDIO_BOOK_MAGIC_WORD:
 				data.amount = book.audio_book_price;
@@ -359,7 +356,24 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			default:
 				throw "Magic word not founds";
 		}
-		data.amount = data.amount - (data.amount * (book.discount_percent || 0) / 100)
+
+		const usedPromos = (await axios({
+			url: `${STRAPI_URL}/users-promo-codes`,
+			method: 'GET',
+			params: {
+				user: req.user.id,
+				book: req.body.book_id,
+				_limit: 1,
+				_sort: 'id:desc'
+			}
+		})).data
+		if (usedPromos?.length) {
+			const promoProduct = (await axios({
+				url: `${STRAPI_URL}/promo-code-products/${usedPromos[0].promo_code.product}`
+			})).data
+			const discount = promoProduct.discount_percent
+			data.amount = data.amount - (data.amount * discount / 100)
+		}
 
 		let qpay_invoice_creation = await axios({
 			method: "POST",
@@ -383,7 +397,6 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			invoice_id: tempInvoiceId,
 			callback_url
 		}
-		console.log(paymenCreatePayload);
 		const paymentCreateResponse = await axios({
 			method: "POST",
 			url: `${STRAPI_URL}/payments`,
@@ -1504,7 +1517,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 		book_categories.forEach((category) => {
 			let tempBooks = books
 				.filter((book) => {
-					let b = book.book_categories.filter((book_category) => category.id == book_category.id);
+					let b = book.book_categories.filter((book_category) => !book.has_audio && category.id == book_category.id);
 					return b.length != 0;
 				})
 				.map((book) => {
@@ -2174,7 +2187,7 @@ app.post('/app/promo', async (req, res) => {
 		url: `${STRAPI_URL}/promo-code-products/${foundPromoCodes[0].product.id}`
 	})).data
 
-	if (moment().isAfter(moment(promoProduct.end_date))) {
+	if (moment().isAfter(moment(foundPromoCodes[0].end_date))) {
 		return res.status(400).send({message: 'Промо кодын хугацаа дууссан байна'})
 	}
 	try {
