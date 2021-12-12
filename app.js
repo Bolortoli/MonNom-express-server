@@ -124,7 +124,17 @@ async function getQpayClient(){
 }
 
 // PUBLIC ENDPOINTS
-
+app.post("/admin-login", async (req, res) => {
+	console.log(req.body);
+	await axios
+		.post(`${STRAPI_URL}/auth/local`, { identifier: req.body.identifier, password: req.body.password }, { Authorization: `${req.headers.authorization}` })
+		.then((response) => {
+			send200(response.data, res);
+		})
+		.catch((err) => {
+			send400("error", res);
+		});
+});
 
 // PRIVATE ENDPOINTS
 
@@ -916,17 +926,6 @@ app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, r
 });
 
 // Login
-app.post("/admin-login", async (req, res) => {
-	console.log(req.body);
-	await axios
-		.post(`${STRAPI_URL}/auth/local`, { identifier: req.body.identifier, password: req.body.password }, { Authorization: `${req.headers.authorization}` })
-		.then((response) => {
-			send200(response.data, res);
-		})
-		.catch((err) => {
-			send400("error", res);
-		});
-});
 
 app.get("/settings-page", async (req, res) => {
 	try {
