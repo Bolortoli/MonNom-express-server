@@ -2162,7 +2162,7 @@ app.post('/app/promo', async (req, res) => {
 
 	const promoCode = req.body.promoCode;
 	const bookId = req.body.bookId;
-	
+
 	const foundPromoCodes = (await axios({
 		url: `${STRAPI_URL}/promo-codes`,
 		method: 'GET',
@@ -2170,8 +2170,7 @@ app.post('/app/promo', async (req, res) => {
 			code: promoCode,
 			_sort: 'id:desc',
 			_limit: 1
-		},
-		headers: 
+		}
 	})).data
 	if (!foundPromoCodes?.length) {
 		console.log('promo code not found')
