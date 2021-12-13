@@ -136,6 +136,16 @@ app.post("/admin-login", async (req, res) => {
 		});
 });
 
+app.post('/app/guest/signup', async (req, res) => {
+	try {
+		const guest = await createGuest({ fcm_token: req.body?.fcm_token });
+		send200(guest, res);
+	} catch (e) {
+		console.log(e);
+		send400('Error creating guest', res);
+	}
+});
+
 // PRIVATE ENDPOINTS
 
 // app version compatibility
@@ -567,6 +577,10 @@ app.get("/test", async (req, res) => {
 // Statistics about dashboard
 app.get("/dashboard", async (req, res) => {
 	try {
+
+		const config = {
+			Authorization: req.headers.authorization
+		}
 		let responseData = {
 			totalPodcastChannels: 0,
 			totalPodcastFollows: 0,
@@ -582,31 +596,31 @@ app.get("/dashboard", async (req, res) => {
 			mostBoughtPDFBooks: [],
 		};
 
-		let customer_saved_books = await axios({ url: `${STRAPI_URL}/customer-paid-books`, method: "GET",}).catch((err) => {
+		let customer_saved_books = await axios({ url: `${STRAPI_URL}/customer-paid-books`, method: "GET", headers: config}).catch((err) => {
 			throw "error saved books";
 		});
 
-		let customer_saved_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks`, method: "GET",}).catch((err) => {
+		let customer_saved_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks`, method: "GET", headers: config}).catch((err) => {
 			throw "error saved ebooks";
 		});
 
-		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET",}).catch((err) => {
+		let podcast_channels = await axios({ url: `${STRAPI_URL}/podcast-channels`, method: "GET", headers: config}).catch((err) => {
 			throw "error podcast channels";
 		});
 
-		let podcast_channels_saves = await axios({ url: `${STRAPI_URL}/user-saved-podcasts`, method: "GET",}).catch((err) => {
+		let podcast_channels_saves = await axios({ url: `${STRAPI_URL}/user-saved-podcasts`, method: "GET", headers: config}).catch((err) => {
 			throw "error saved podcasts";
 		});
 
-		let totalRadioChannels = await axios({ url: `${STRAPI_URL}/radio-channels/count`, method: "GET",}).catch((err) => {
+		let totalRadioChannels = await axios({ url: `${STRAPI_URL}/radio-channels/count`, method: "GET", headers: config}).catch((err) => {
 			throw "error radio";
 		});
 
-		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET",}).catch((err) => {
+		let books = await axios({ url: `${STRAPI_URL}/books`, method: "GET", headers: config}).catch((err) => {
 			throw "error books";
 		});
 
-		let app_users = await axios({ url: `${STRAPI_URL}/users?user_role=6`, method: "GET",}).catch((err) => {
+		let app_users = await axios({ url: `${STRAPI_URL}/users?user_role=6`, method: "GET", headers: config}).catch((err) => {
 			throw "error users";
 		});
 
@@ -718,11 +732,14 @@ app.get("/dashboard", async (req, res) => {
 
 app.get("/book-add-informations", async (req, res) => {
 	try {
+		const headers = {
+			Authorization: req.headers.authorization
+		}
 		let sendData = { available_authors: null, available_categories: null };
-		let authors = await axios({ method: "GET", url: `${STRAPI_URL}/book-authors`,}).catch((err) => {
+		let authors = await axios({ method: "GET", url: `${STRAPI_URL}/book-authors`, headers}).catch((err) => {
 			throw "error-authors";
 		});
-		let categories = await axios({ method: "GET", url: `${STRAPI_URL}/book-categories`,}).catch((err) => {
+		let categories = await axios({ method: "GET", url: `${STRAPI_URL}/book-categories`, headers}).catch((err) => {
 			throw "error-categpries";
 		});
 
@@ -1018,7 +1035,10 @@ app.get("/settings-page", async (req, res) => {
 // List of employees
 app.get("/all-admins-list", (req, res) => {
 	// console.log(req);
-	axios({ url: `${STRAPI_URL}/users?user_role=1&user_role=2&user_role=3&user_role=4&user_role=5`, method: "GET" })
+	const headers = {
+		Authorization: req.headers.authorization
+	}
+	axios({ url: `${STRAPI_URL}/users?user_role=1&user_role=2&user_role=3&user_role=4&user_role=5`, method: "GET", headers })
 		.then((response) => {
 			console.log(response.data.map((d) => d.user_role));
 			send200(response.data, res);
@@ -1031,8 +1051,11 @@ app.get("/all-admins-list", (req, res) => {
 
 // List of employees who are don't have podcast channel
 app.get("/all-admins-settings", async (req, res) => {
+	const headers = {
+		Authorization: req.headers.authorization
+	}
 	// console.log(req);
-	await axios({ url: `${STRAPI_URL}/users?podcast_channel_null=true`, method: "GET",})
+	await axios({ url: `${STRAPI_URL}/users?podcast_channel_null=true`, method: "GET", headers})
 		.then((response) => {
 			let sendData = response.data.filter((data) => data.user_role == 1 || data.user_role == 2 || data.user_role == 3 || data.user_role == 4 || data.user_role == 5);
 			send200(sendData, res);
@@ -1179,16 +1202,6 @@ app.get("/all-books-list", async (req, res) => {
 // app.post('/app/guest/login', async (req, res) => {
 
 // });
-
-app.post('/app/guest/signup', async (req, res) => {
-	try {
-		const guest = await createGuest({ fcm_token: req.body?.fcm_token });
-		send200(guest, res);
-	} catch (e) {
-		console.log(e);
-		send400('Error creating guest', res);
-	}
-});
 
 // Unsave podcast channel
 app.post("/app/unsave-podcast-channel", async (req, res, next) => {
