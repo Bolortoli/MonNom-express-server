@@ -1836,25 +1836,27 @@ app.get(`/app/podcast-channel/:channel_id/:user_id?`, async (req, res) => {
 });
 
 app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
-	console.log(req.user)
 	try {
+		const config = {
+			Authorization: req.headers.authorization
+		}
 		let responseData = { book: {}, imageComments: [], comments: [], relatedBooks: [] };
 		let book = await axios({ url: `${STRAPI_URL}/books/${req.params.book_id}`, method: "GET",}).catch((err) => {
 			console.log(err)
 			throw "error1";
 		});
 
-		let customer_paid_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
+		let customer_paid_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET", headers: config}).catch((err) => {
 			console.log(err)
 			throw "error2";
 		});
 
-		let customer_paid_books = await axios({ url: `${STRAPI_URL}/customer-paid-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
+		let customer_paid_books = await axios({ url: `${STRAPI_URL}/customer-paid-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET", headers: config}).catch((err) => {
 			console.log(err)
 			throw "error3";
 		});
 
-		let customer_paid_audio_books = await axios({ url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
+		let customer_paid_audio_books = await axios({ url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET", headers: config}).catch((err) => {
 			console.log(err)
 			throw "error3";
 		});
@@ -1885,14 +1887,17 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 				book: req.params.book_id,
 				_limit: 1,
 				_sort: 'id:desc'
-			}
+			},
+			headers: config
 		})).data
 
 		let promoProduct;
 
 		if (usedPromos?.length) {
 			promoProduct = (await axios({
-				url: `${STRAPI_URL}/promo-code-products/${usedPromos[0].promo_code.product}`
+				url: `${STRAPI_URL}/promo-code-products/${usedPromos[0].promo_code.product}`,
+				method: 'GET',
+				headers: config
 			})).data
 		}
 
@@ -1911,10 +1916,7 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 			isEpub = book?.is_ebook_epub
 			absPdfPath = resolveURL(book?.pdf_book_path?.url);
 			absEpubPath = resolveURL(book?.epub_book_path?.url);
-			console.log(book?.epub_book_path?.url)
 		}
-
-		console.log(promoProduct)
 
 		responseData.book = {
 			id: book.id,
@@ -2160,7 +2162,7 @@ app.post('/app/promo', async (req, res) => {
 
 	const promoCode = req.body.promoCode;
 	const bookId = req.body.bookId;
-
+	
 	const foundPromoCodes = (await axios({
 		url: `${STRAPI_URL}/promo-codes`,
 		method: 'GET',
@@ -2168,7 +2170,8 @@ app.post('/app/promo', async (req, res) => {
 			code: promoCode,
 			_sort: 'id:desc',
 			_limit: 1
-		}
+		},
+		headers: 
 	})).data
 	if (!foundPromoCodes?.length) {
 		console.log('promo code not found')
