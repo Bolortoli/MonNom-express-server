@@ -1845,14 +1845,17 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 		});
 
 		let customer_paid_ebooks = await axios({ url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
+			console.log(err)
 			throw "error2";
 		});
 
 		let customer_paid_books = await axios({ url: `${STRAPI_URL}/customer-paid-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
+			console.log(err)
 			throw "error3";
 		});
 
 		let customer_paid_audio_books = await axios({ url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user=${req.user.id}&book.id=${req.params.book_id}`, method: "GET",}).catch((err) => {
+			console.log(err)
 			throw "error3";
 		});
 
