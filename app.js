@@ -1,3 +1,5 @@
+dotenv.config();
+
 import express from "express";
 import axios from "axios";
 import bodyParser from "body-parser";
@@ -9,8 +11,9 @@ import moment from 'moment';
 import randToken from 'rand-token';
 import randomatic from 'randomatic';
 import jwt from 'express-jwt';
+import legacyPublicRoutes from './routes/legacyPublicRoutes.js';
+import legacyPrivateRoutes from './routes/legacyPrivateRoutes.js';
 
-dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -145,6 +148,8 @@ app.post('/app/guest/signup', async (req, res) => {
 		send400('Error creating guest', res);
 	}
 });
+
+app.use(legacyPublicRoutes)
 
 // PRIVATE ENDPOINTS
 
@@ -2185,10 +2190,13 @@ app.post('/app/promo', async (req, res) => {
 			_limit: 1
 		}
 	})).data
-	if (!foundPromoCodes?.length) {
-		console.log('promo code not found')
+
+	const foundPromoCode = foundPromoCodes?.length ? foundPromoCodes[0] : null;
+
+	if (foundPromoCode?.book !== bookId) {
 		return res.status(400).send({message: 'Промо код олдсонгүй'})
 	}
+
 	const usedPromoCodeResponse = (await axios({ 
 		url: `${STRAPI_URL}/users-promo-codes`,
 		method: "GET",
@@ -2202,10 +2210,10 @@ app.post('/app/promo', async (req, res) => {
 
 	// validate promo end date
 	const promoProduct = (await axios({
-		url: `${STRAPI_URL}/promo-code-products/${foundPromoCodes[0].product.id}`
+		url: `${STRAPI_URL}/promo-code-products/${foundPromoCode.product.id}`
 	})).data
 
-	if (moment().isAfter(moment(foundPromoCodes[0].end_date))) {
+	if (moment().isAfter(moment(foundPromoCode.end_date))) {
 		return res.status(400).send({message: 'Промо кодын хугацаа дууссан байна'})
 	}
 	try {
@@ -2213,11 +2221,11 @@ app.post('/app/promo', async (req, res) => {
 			url: `${STRAPI_URL}/users-promo-codes`, 
 			method: 'POST', 
 			data: {
-				promo_code: foundPromoCodes[0].id,
+				promo_code: foundPromoCode.id,
 				'book': bookId,
 				'user': req.user.id
 			}})
-		console.log(writeResponse.data)
+		
 		res.send({
 			message: 'success'
 		})
@@ -2226,6 +2234,9 @@ app.post('/app/promo', async (req, res) => {
 		res.status(400).send({mesasge: `Промо код олдсонгүй`})
 	}
 })
+
+// Legacy endpoints
+app.use(legacyPrivateRoutes);
 
 // ----------------------------- UTILITY FUNCTIONs -----------------------------
 
