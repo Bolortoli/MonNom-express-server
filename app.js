@@ -170,7 +170,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
-				Authorization: `${tempAuthJwt}`,
+				Authorization: `Bearer ${tempAuthJwt}`,
 			},
 		});
 		const invoice_id = req.params.invoice_id;
