@@ -149,6 +149,128 @@ app.post('/app/guest/signup', async (req, res) => {
 	}
 });
 
+app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:delivery_id?", async (req, res, next) => {
+
+	// callback validation
+	if (['customer-paid-books', 'customer-paid-ebooks', 'customer-paid-audio-books'].indexOf(req.params.payment_collection_name) == -1) {
+		send400({ error: "Wrong Collection" }, res);
+		return;
+	}
+
+	try {
+		const tempAuthResponse = await axios({
+			url: `${STRAPI_URL}/auth/local`,
+			method: 'POST',
+			data: {
+				identifier: 'qpaytempuser@qpaytempuser.com',
+				password: 'qpaytempuser'
+			}
+		})
+		const tempAuthJwt = tempAuthResponse.data.jwt;
+		const apiClient = axios.create({
+			baseURL: STRAPI_URL,
+			headers: {
+				Authorization: `${tempAuthJwt}`,
+			},
+		});
+		const invoice_id = req.params.invoice_id;
+		let paymentResponse = await apiClient.get(`/payments?invoice_id=${invoice_id}`).catch((err) => {
+			throw "Fetching payment failed";
+		});
+
+		paymentResponse = paymentResponse.data[0];
+
+		// check qpay payment
+		const qpayInvoiceId = paymentResponse.qpay_invoice_id
+		const qpayClient = await getQpayClient();
+		const qpayPaymentCheckResponse = await qpayClient.post('/payment/check', {
+			"object_type": "INVOICE",
+			"object_id"  : qpayInvoiceId
+		})
+		const paidRow = qpayPaymentCheckResponse.data.rows.find((row) => row.payment_status === 'PAID');
+		const isPaid = paidRow != undefined;
+		const paidAmount = qpayPaymentCheckResponse.data.paid_amount
+		let paymentUpdateResponse;
+		try {
+			paymentUpdateResponse = await apiClient.put(`/payments/${paymentResponse.id}`, {
+				is_approved: isPaid,
+				paid_amount: paidAmount,
+				payment_data: JSON.stringify(req.body || {}) + "get",
+			});
+		} catch (e) {
+			throw "Payment update failed";
+		}
+		
+		// check payment before grant book
+		if (!isPaid){
+			send400('NOT_PAID', res);
+			return;
+		}
+		console.log('paid');
+
+		// give permission to user
+		paymentUpdateResponse = paymentUpdateResponse.data;
+		const bookPaymentResponse = await apiClient
+			.post(`/${req.params.payment_collection_name}`, {
+				book: paymentUpdateResponse.book.id,
+				users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
+				payment: paymentUpdateResponse.id,
+			})
+			.catch((err) => {
+				throw "Failed to save on collection name";
+			});
+
+		// update delivery
+		if (parseInt(req.params.delivery_id)) {
+			try {
+				await apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, {
+					is_paid: true,
+					customer_paid_book: bookPaymentResponse.data.id
+				});
+			} catch (e) {
+				console.log('Delivery put failed');
+			}
+		} else {
+			console.log('no delivery')
+			console.log(req.params.delivery_id)
+		}
+
+		// send notification
+		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
+		const user = userResponse.data[0];
+		const fcmToken = user?.fcm_token;
+		await axios({
+			url: "https://fcm.googleapis.com/fcm/send",
+			method: "POST",
+			headers: { Authorization: `key=${process.env.FCM_SERVER_KEY}` },
+			data: {
+				registration_ids: [fcmToken],
+				channel_id: "notifee_channel1",
+				notification: { title: "Төлбөр амжилттай", body: "" },
+				data: {
+					title: "Төлбөр амжилттай",
+					body: "",
+					book_id: paymentUpdateResponse.book.id,
+					type: "book_payment",
+					content_available: true
+				},
+				android: {
+					"priority": "HIGH"
+				},
+
+			},
+		}).catch((err) => {
+			console.log('notification error');
+			console.log(err);
+			throw "Failed to send notification";
+		});
+		send200(paymentUpdateResponse, res);
+	} catch (e) {
+		console.log(e);
+		send400(e, res);
+	}
+});
+
 app.use(legacyPublicRoutes)
 
 // PRIVATE ENDPOINTS
@@ -452,128 +574,6 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		console.log("err");
 		console.log(error);
 		send400(error, res);
-	}
-});
-
-app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:delivery_id?", async (req, res, next) => {
-
-	// callback validation
-	if (['customer-paid-books', 'customer-paid-ebooks', 'customer-paid-audio-books'].indexOf(req.params.payment_collection_name) == -1) {
-		send400({ error: "Wrong Collection" }, res);
-		return;
-	}
-
-	try {
-		const tempAuthResponse = await axios({
-			url: `${STRAPI_URL}/auth/local`,
-			method: 'POST',
-			data: {
-				identifier: 'qpaytempuser@qpaytempuser.com',
-				password: 'qpaytempuser'
-			}
-		})
-		const tempAuthJwt = tempAuthResponse.data.jwt;
-		const apiClient = axios.create({
-			baseURL: STRAPI_URL,
-			headers: {
-				Authorization: `${tempAuthJwt}`,
-			},
-		});
-		const invoice_id = req.params.invoice_id;
-		let paymentResponse = await apiClient.get(`/payments?invoice_id=${invoice_id}`).catch((err) => {
-			throw "Fetching payment failed";
-		});
-
-		paymentResponse = paymentResponse.data[0];
-
-		// check qpay payment
-		const qpayInvoiceId = paymentResponse.qpay_invoice_id
-		const qpayClient = await getQpayClient();
-		const qpayPaymentCheckResponse = await qpayClient.post('/payment/check', {
-			"object_type": "INVOICE",
-			"object_id"  : qpayInvoiceId
-		})
-		const paidRow = qpayPaymentCheckResponse.data.rows.find((row) => row.payment_status === 'PAID');
-		const isPaid = paidRow != undefined;
-		const paidAmount = qpayPaymentCheckResponse.data.paid_amount
-		let paymentUpdateResponse;
-		try {
-			paymentUpdateResponse = await apiClient.put(`/payments/${paymentResponse.id}`, {
-				is_approved: isPaid,
-				paid_amount: paidAmount,
-				payment_data: JSON.stringify(req.body || {}) + "get",
-			});
-		} catch (e) {
-			throw "Payment update failed";
-		}
-		
-		// check payment before grant book
-		if (!isPaid){
-			send400('NOT_PAID', res);
-			return;
-		}
-		console.log('paid');
-
-		// give permission to user
-		paymentUpdateResponse = paymentUpdateResponse.data;
-		const bookPaymentResponse = await apiClient
-			.post(`/${req.params.payment_collection_name}`, {
-				book: paymentUpdateResponse.book.id,
-				users_permissions_user: paymentUpdateResponse.users_permissions_user.id,
-				payment: paymentUpdateResponse.id,
-			})
-			.catch((err) => {
-				throw "Failed to save on collection name";
-			});
-
-		// update delivery
-		if (parseInt(req.params.delivery_id)) {
-			try {
-				await apiClient.put(`/delivery-registrations/${req.params.delivery_id}`, {
-					is_paid: true,
-					customer_paid_book: bookPaymentResponse.data.id
-				});
-			} catch (e) {
-				console.log('Delivery put failed');
-			}
-		} else {
-			console.log('no delivery')
-			console.log(req.params.delivery_id)
-		}
-
-		// send notification
-		const userResponse = await apiClient.get(`/users?id=${paymentUpdateResponse.users_permissions_user.id}`);
-		const user = userResponse.data[0];
-		const fcmToken = user?.fcm_token;
-		await axios({
-			url: "https://fcm.googleapis.com/fcm/send",
-			method: "POST",
-			headers: { Authorization: `key=${process.env.FCM_SERVER_KEY}` },
-			data: {
-				registration_ids: [fcmToken],
-				channel_id: "notifee_channel1",
-				notification: { title: "Төлбөр амжилттай", body: "" },
-				data: {
-					title: "Төлбөр амжилттай",
-					body: "",
-					book_id: paymentUpdateResponse.book.id,
-					type: "book_payment",
-					content_available: true
-				},
-				android: {
-					"priority": "HIGH"
-				},
-
-			},
-		}).catch((err) => {
-			console.log('notification error');
-			console.log(err);
-			throw "Failed to send notification";
-		});
-		send200(paymentUpdateResponse, res);
-	} catch (e) {
-		console.log(e);
-		send400(e, res);
 	}
 });
 
