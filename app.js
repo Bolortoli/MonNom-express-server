@@ -323,6 +323,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		// get user data
 		let user = await axios({ method: "GET", url: `${STRAPI_URL}/users/${req.user.id}`,}).catch((err) => {
 			console.log(`${STRAPI_URL}/users/${req.user.id}`)
+			console.log(err)
 			throw "Fetch user failed";
 		});
 		user = user.data;
