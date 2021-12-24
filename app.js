@@ -2180,7 +2180,7 @@ app.post('/app/promo', async (req, res) => {
 
 	const promoCode = req.body.promoCode;
 	const bookId = req.body.bookId;
-
+	console.log(promoCode)
 	const foundPromoCodes = (await axios({
 		url: `${STRAPI_URL}/promo-codes`,
 		method: 'GET',
