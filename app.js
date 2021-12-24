@@ -2178,6 +2178,8 @@ app.get(`/app/search/podcast/:search`, async (req, res) => {
 // POST
 app.post('/app/promo', async (req, res) => {
 
+	const userId = req.user?.id;
+	const nowParam = moment().format('YYYY-MM-DD+HH:mm:ss')
 	const promoCode = req.body.promoCode;
 	const bookId = req.body.bookId;
 	const foundPromoCodes = (await axios({
@@ -2185,33 +2187,56 @@ app.post('/app/promo', async (req, res) => {
 		method: 'GET',
 		params: {
 			code: promoCode,
+			end_date_gt: nowParam,
 			_sort: 'id:desc',
 			_limit: 1
 		}
 	})).data
+	
 	const foundPromoCode = foundPromoCodes?.length ? foundPromoCodes[0] : null;
-	console.log(foundPromoCode)
-	console.log(parseInt(foundPromoCode?.book?.id))
-	console.log(parseInt(bookId))
-	if (parseInt(foundPromoCode?.book?.id) !== parseInt(bookId)) {
+	if (!foundPromoCode || (parseInt(foundPromoCode?.book?.id) !== parseInt(bookId))) {
 		return res.status(400).send({message: 'Промо код олдсонгүй'})
-	}
-
-	const usedPromoCodeResponse = (await axios({ 
-		url: `${STRAPI_URL}/users-promo-codes`,
-		method: "GET",
-		params: {
-			'promo_code.code': promoCode,
-			_limit: 1
-		} })).data;
-	if (usedPromoCodeResponse?.length) {
-		return res.status(400).send({message: 'Промо код хэрэглэгдсэн байна'})
 	}
 
 	// validate promo end date
 	const promoProduct = (await axios({
 		url: `${STRAPI_URL}/promo-code-products/${foundPromoCode.product.id}`
 	})).data
+
+	if (!promoProduct) {
+		return res.status(400).send({
+			message: 'Промо код идэвхигүй байна'
+		})
+	}
+
+	if (promoProduct.is_gift) {
+		const usedGifts = (await axios({ 
+			url: `${STRAPI_URL}/users-promo-codes`,
+			method: "GET",
+			params: {
+				'promo_code.code': promoCode,
+				'end_date_gt': nowParam,
+				_limit: 1
+			} })).data;
+		if (usedGifts?.length) {
+			return res.status(400).send({message: 'Промо код хэрэглэгдсэн байна'})
+		}
+	} else if (promoProduct.is_discount) {
+		const usedDiscount = (await axios({ 
+			url: `${STRAPI_URL}/users-promo-codes`,
+			method: "GET",
+			params: {
+				'promo_code.code': promoCode,
+				'promo_code.end_date_gt': nowParam,
+				'user': userId,
+				_limit: 1
+			} })).data;
+		if (usedDiscount?.length) {
+			return res.status(400).send({message: 'Промо код хэрэглэгдсэн байна'})
+		}
+	} else {
+		return res.status(400).send({ message: 'Промо код идэвхигүй байна' })
+	}
 
 	if (moment().isAfter(moment(foundPromoCode.end_date))) {
 		return res.status(400).send({message: 'Промо кодын хугацаа дууссан байна'})
