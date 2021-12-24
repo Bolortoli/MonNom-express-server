@@ -175,6 +175,7 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 		});
 		const invoice_id = req.params.invoice_id;
 		let paymentResponse = await apiClient.get(`/payments?invoice_id=${invoice_id}`).catch((err) => {
+			console.log(err)
 			throw "Fetching payment failed";
 		});
 
