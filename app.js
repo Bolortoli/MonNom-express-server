@@ -2183,14 +2183,8 @@ app.post('/app/promo', async (req, res) => {
 	const promoCode = req.body.promoCode;
 	const bookId = req.body.bookId;
 	const foundPromoCodes = (await axios({
-		url: `${STRAPI_URL}/promo-codes`,
-		method: 'GET',
-		params: {
-			code: promoCode,
-			end_date_gt: nowParam,
-			_sort: 'id:desc',
-			_limit: 1
-		}
+		url: `${STRAPI_URL}/promo-codes?code=${promoCode}&end_date_gt=${nowParam}&_sort=id:desec&_limit=1`,
+		method: 'GET'
 	})).data
 
 	const foundPromoCode = foundPromoCodes?.length ? foundPromoCodes[0] : null;
@@ -2211,26 +2205,14 @@ app.post('/app/promo', async (req, res) => {
 
 	if (promoProduct.is_gift) {
 		const usedGifts = (await axios({ 
-			url: `${STRAPI_URL}/users-promo-codes`,
-			method: "GET",
-			params: {
-				'promo_code.code': promoCode,
-				'end_date_gt': nowParam,
-				_limit: 1
-			} })).data;
+			url: `${STRAPI_URL}/users-promo-codes?promo_code.code=${promoCode}&end_date_gt=${nowParam}`,method: "GET"})).data;
 		if (usedGifts?.length) {
 			return res.status(400).send({message: 'Промо код хэрэглэгдсэн байна'})
 		}
 	} else if (promoProduct.is_discount) {
 		const usedDiscount = (await axios({ 
-			url: `${STRAPI_URL}/users-promo-codes`,
-			method: "GET",
-			params: {
-				'promo_code.code': promoCode,
-				'promo_code.end_date_gt': nowParam,
-				'user': userId,
-				_limit: 1
-			} })).data;
+			url: `${STRAPI_URL}/users-promo-codes?promo_code.code=${promoCode}&promo_code.end_date_gt=${nowParam}&user=${userId}&_limit=1`,
+			method: "GET"})).data;
 		if (usedDiscount?.length) {
 			return res.status(400).send({message: 'Промо код хэрэглэгдсэн байна'})
 		}
