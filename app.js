@@ -2193,7 +2193,7 @@ app.post('/app/promo', async (req, res) => {
 
 	const foundPromoCode = foundPromoCodes?.length ? foundPromoCodes[0] : null;
 
-	if (foundPromoCode?.book !== bookId) {
+	if (foundPromoCode?.book?.id !== bookId) {
 		return res.status(400).send({message: 'Промо код олдсонгүй'})
 	}
 
