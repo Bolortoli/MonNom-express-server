@@ -2193,7 +2193,7 @@ app.post('/app/promo', async (req, res) => {
 		url: `${STRAPI_URL}/promo-codes?code=${promoCode}&end_date_gt=${nowParam}&_sort=id:desc&_limit=1`,
 		method: 'GET'
 	})).data
-
+	console.log(foundPromoCodes)
 	const foundPromoCode = foundPromoCodes?.length ? foundPromoCodes[0] : null;
 	if (!foundPromoCode || (parseInt(foundPromoCode?.book?.id) !== parseInt(bookId))) {
 		return res.status(400).send({message: 'Промо код олдсонгүй'})
