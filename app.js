@@ -2211,7 +2211,7 @@ app.post('/app/promo', async (req, res) => {
 
 	if (promoProduct.is_gift) {
 		const usedGifts = (await axios({ 
-			url: `${STRAPI_URL}/users-promo-codes?promo_code.code=${promoCode}&end_date_gt=${nowParam}`,method: "GET"})).data;
+			url: `${STRAPI_URL}/users-promo-codes?promo_code.code=${promoCode}&promo_code.end_date_gt=${nowParam}`,method: "GET"})).data;
 		if (usedGifts?.length) {
 			return res.status(400).send({message: 'Промо код хэрэглэгдсэн байна'})
 		}
