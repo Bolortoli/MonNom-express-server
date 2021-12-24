@@ -2189,8 +2189,8 @@ app.post('/app/promo', async (req, res) => {
 			_limit: 1
 		}
 	})).data
-	console.log(foundPromoCode)
 	const foundPromoCode = foundPromoCodes?.length ? foundPromoCodes[0] : null;
+	console.log(foundPromoCode)
 	if (parseInt(foundPromoCode?.book?.id) !== parseInt(bookId)) {
 		return res.status(400).send({message: 'Промо код олдсонгүй'})
 	}
