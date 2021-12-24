@@ -1911,7 +1911,7 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 
 		let promoProduct;
 
-		if (usedPromos?.length) {
+		if (usedPromos?.length && usedPromos[0]?.promo_code?.product) {
 			promoProduct = (await axios({
 				url: `${STRAPI_URL}/promo-code-products/${usedPromos[0].promo_code.product}`,
 				method: 'GET',
@@ -2192,7 +2192,7 @@ app.post('/app/promo', async (req, res) => {
 			_limit: 1
 		}
 	})).data
-	
+
 	const foundPromoCode = foundPromoCodes?.length ? foundPromoCodes[0] : null;
 	if (!foundPromoCode || (parseInt(foundPromoCode?.book?.id) !== parseInt(bookId))) {
 		return res.status(400).send({message: 'Промо код олдсонгүй'})
