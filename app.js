@@ -2183,7 +2183,7 @@ app.post('/app/promo', async (req, res) => {
 	const promoCode = req.body.promoCode;
 	const bookId = req.body.bookId;
 	const foundPromoCodes = (await axios({
-		url: `${STRAPI_URL}/promo-codes?code=${promoCode}&end_date_gt=${nowParam}&_sort=id:desec&_limit=1`,
+		url: `${STRAPI_URL}/promo-codes?code=${promoCode}&end_date_gt=${nowParam}&_sort=id:desc&_limit=1`,
 		method: 'GET'
 	})).data
 
