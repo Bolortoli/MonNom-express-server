@@ -310,21 +310,22 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 
 		let tempInvoiceId = create_temp_unique_text("xxxxxx-xxxxxx");
 
+		const config = {
+			Authorization: `Bearer ${req.headers.authorization}`
+		}
+
 		// Get QPAY access token
 		let qpay_access = await axios({ method: "POST", url: QPAY_MERCHANT_AUTHENTICATION, auth: { username: QPAY_MERCHANT_USERNAME, password: QPAY_MERCHANT_PASSWORD } }).catch((err) => {
 			throw "QPAY authorization failed";
 		});
 
 		// For get book price
-		let book = await axios({ method: "GET", url: `${STRAPI_URL}/books/${req.body.book_id}`,}).catch((err) => {
+		let book = await axios({ method: "GET", url: `${STRAPI_URL}/books/${req.body.book_id}`, headers: config}).catch((err) => {
 			throw "Fetch book failed";
 		});
 
 		// get user data
-		const auth = {
-			Authorization: `Bearer ${req.headers.authorization}`
-		}
-		let user = await axios({ method: "GET", url: `${STRAPI_URL}/users/${req.user.id}`, auth}).catch((err) => {
+		let user = await axios({ method: "GET", url: `${STRAPI_URL}/users/${req.user.id}`, headers: config}).catch((err) => {
 			throw "Fetch user failed";
 		});
 		user = user.data;
@@ -382,12 +383,14 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 				book: req.body.book_id,
 				_limit: 1,
 				_sort: 'id:desc'
-			}
+			},
+			headers: config
 		})).data
 		if (usedPromos?.length) {
 			const promoProduct = (await axios({
 				url: `${STRAPI_URL}/promo-code-products/${usedPromos[0].promo_code.product}`,
-				method: 'GET'
+				method: 'GET',
+				headers: config
 			})).data
 			const discount = promoProduct.discount_percent
 			data.amount = data.amount - (data.amount * discount / 100)
