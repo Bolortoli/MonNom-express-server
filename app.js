@@ -280,6 +280,7 @@ app.use(legacyPublicRoutes)
 
 // Create customer
 app.post("/app/create-user", async (req, res) => {
+	console.log(`create user`)
 	axios({
 		url: `${STRAPI_URL}/users`,
 		method: "POST",
@@ -305,6 +306,7 @@ app.post("/app/create-user", async (req, res) => {
 				})
 				.catch((err) => {
 					console.log("2nd");
+					console.log(err)
 					throw "error";
 				});
 		})
