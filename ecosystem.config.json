@@ -1,0 +1,9 @@
+{
+    "apps": [
+        {
+            "name": "monnom-express",
+            "script": "start.sh",
+            "instances": "max"
+        }
+    ]
+}
