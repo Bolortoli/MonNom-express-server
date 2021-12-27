@@ -11,6 +11,8 @@ import moment from 'moment';
 import randToken from 'rand-token';
 import randomatic from 'randomatic';
 import jwt from 'express-jwt';
+import helmet from 'helmet';
+import compression from 'compression';
 import legacyPublicRoutes from './routes/legacyPublicRoutes.js';
 import legacyPrivateRoutes from './routes/legacyPrivateRoutes.js';
 
@@ -44,6 +46,8 @@ const PASSWORD_RESET_VALID_MINUTES = 1;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(compression())
+app.use(helmet())
 
 const fileStorageEngine = multer.diskStorage({
 	destination: (req, file, cb) => {
