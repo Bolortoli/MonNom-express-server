@@ -153,6 +153,49 @@ app.post('/app/guest/signup', async (req, res) => {
 	}
 });
 
+// Check if phone number can be username, then create confirmation code and send sms
+app.post("/create-confirmation-code", async (req, res) => {
+	try {
+		let confirmationCode = create_temp_unique_text("xxxxxx");
+		let users = await axios({
+			url: `${STRAPI_URL}/users?username=${req.body.phone}`,
+			method: "GET",
+		}).catch((err) => {
+			throw "failed to filter users";
+		});
+
+		if (users.data.length != 0) throw "Phone exists";
+
+		await axios({
+			url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${req.body.phone}&message=Mon Nom confirmation code:%20 ${confirmationCode}`,
+			method: "GET",
+		}).catch((err) => {
+			throw "Failed to send message";
+		});
+
+		send200({ confirmationCode, phone: req.body.phone }, res);
+	} catch (error) {
+		send400("error", res);
+	}
+});
+
+app.post("/app/check-email", async (req, res) => {
+	try {
+		let users = await axios({
+			url: `${STRAPI_URL}/users?email=${req.body.email}`,
+			method: "GET",
+		}).catch((err) => {
+			throw "failed to filter users";
+		});
+
+		if (users.data.length != 0) throw "Email exists";
+
+		send200({}, res);
+	} catch (error) {
+		send400(error, res);
+	}
+});
+
 app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:delivery_id?", async (req, res, next) => {
 
 	// callback validation
@@ -280,7 +323,6 @@ app.use(legacyPublicRoutes)
 
 // Create customer
 app.post("/app/create-user", async (req, res) => {
-	console.log(`create user`)
 	axios({
 		url: `${STRAPI_URL}/users`,
 		method: "POST",
@@ -1423,49 +1465,6 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 		});
 
 		send200(responseData, res);
-	} catch (error) {
-		send400(error, res);
-	}
-});
-
-// Check if phone number can be username, then create confirmation code and send sms
-app.post("/create-confirmation-code", async (req, res) => {
-	try {
-		let confirmationCode = create_temp_unique_text("xxxxxx");
-		let users = await axios({
-			url: `${STRAPI_URL}/users?username=${req.body.phone}`,
-			method: "GET",
-		}).catch((err) => {
-			throw "failed to filter users";
-		});
-
-		if (users.data.length != 0) throw "Phone exists";
-
-		await axios({
-			url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${req.body.phone}&message=Mon Nom confirmation code:%20 ${confirmationCode}`,
-			method: "GET",
-		}).catch((err) => {
-			throw "Failed to send message";
-		});
-
-		send200({ confirmationCode, phone: req.body.phone }, res);
-	} catch (error) {
-		send400("error", res);
-	}
-});
-
-app.post("/app/check-email", async (req, res) => {
-	try {
-		let users = await axios({
-			url: `${STRAPI_URL}/users?email=${req.body.email}`,
-			method: "GET",
-		}).catch((err) => {
-			throw "failed to filter users";
-		});
-
-		if (users.data.length != 0) throw "Email exists";
-
-		send200({}, res);
 	} catch (error) {
 		send400(error, res);
 	}
