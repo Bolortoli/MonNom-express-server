@@ -274,17 +274,42 @@ app.get("/payment/payment-callback/:invoice_id/:payment_collection_name/:deliver
 
 app.use(legacyPublicRoutes)
 
-// PRIVATE ENDPOINTS
-
-// app version compatibility
-app.use((req, res, next) => {
-	if (!req.headers.authorization?.toString().startsWith('Bearer')) {
-		req.headers.authorization = `Bearer ${req.headers.authorization}`
-	}
-	next();
-})
-
-app.use(jwt({ secret: process.env.JWT_SECRET, algorithms: ['HS256'] }));
+// Create customer
+app.post("/app/create-user", async (req, res) => {
+	axios({
+		url: `${STRAPI_URL}/users`,
+		method: "POST",
+		data: {
+			username: req.body.phoneNumber,
+			phone: req.body.phoneNumber,
+			password: req.body.password,
+			email: req.body.email,
+			gender: req.body.gender,
+			birthday: req.body.birthday,
+			fullname: req.body.fullName,
+			user_role: 6,
+		},
+	})
+		.then((response) => {
+			axios
+				.post(`${STRAPI_URL}/auth/local`, {
+					identifier: req.body.phoneNumber,
+					password: req.body.password,
+				})
+				.then((response) => {
+					send200(response.data, res);
+				})
+				.catch((err) => {
+					console.log("2nd");
+					throw "error";
+				});
+		})
+		.catch((err) => {
+			console.log(err);
+			console.log("1st");
+			send400("error", res);
+		});
+});
 
 // send password reset url
 app.post('/user/forgot-password', async (req, res) => {
@@ -409,6 +434,18 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 	}
 	await tempUser.delete();
 });
+
+// PRIVATE ENDPOINTS
+
+// app version compatibility
+app.use((req, res, next) => {
+	if (!req.headers.authorization?.toString().startsWith('Bearer')) {
+		req.headers.authorization = `Bearer ${req.headers.authorization}`
+	}
+	next();
+})
+
+app.use(jwt({ secret: process.env.JWT_SECRET, algorithms: ['HS256'] }));
 
 // ----------------------------- PAYEMNT APIs -----------------------------
 
@@ -1426,43 +1463,6 @@ app.post("/app/check-email", async (req, res) => {
 	} catch (error) {
 		send400(error, res);
 	}
-});
-
-// Create customer
-app.post("/app/create-user", async (req, res) => {
-	axios({
-		url: `${STRAPI_URL}/users`,
-		method: "POST",
-		data: {
-			username: req.body.phoneNumber,
-			phone: req.body.phoneNumber,
-			password: req.body.password,
-			email: req.body.email,
-			gender: req.body.gender,
-			birthday: req.body.birthday,
-			fullname: req.body.fullName,
-			user_role: 6,
-		},
-	})
-		.then((response) => {
-			axios
-				.post(`${STRAPI_URL}/auth/local`, {
-					identifier: req.body.phoneNumber,
-					password: req.body.password,
-				})
-				.then((response) => {
-					send200(response.data, res);
-				})
-				.catch((err) => {
-					console.log("2nd");
-					throw "error";
-				});
-		})
-		.catch((err) => {
-			console.log(err);
-			console.log("1st");
-			send400("error", res);
-		});
 });
 
 //
