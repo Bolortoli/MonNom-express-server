@@ -139,6 +139,7 @@ app.post("/admin-login", async (req, res) => {
 			send200(response.data, res);
 		})
 		.catch((err) => {
+			console.log(err)
 			send400("error", res);
 		});
 });
