@@ -1477,6 +1477,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 		let responseData = {
 			bestBooks: [],
 			audioBooks: [],
+			audioBookCategories: [],
 			categoriesWithBooks: [],
 			specialBook: null,
 		};
@@ -1528,6 +1529,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 		book_categories = book_categories?.data || [];
 		special_book = special_book?.data || null;
 		user_saved_books = user_saved_books?.data || [];
+		responseData.audioBookCategories = book_categories || [];
 
 		books.forEach((book) => {
 			if (book.is_featured) {
@@ -1540,11 +1542,24 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 					else tempAuthorsString += `${author.author_name}  `;
 				});
 
+				const category = book_categories.find((c) => book.book_categories.find((c2) => c.id === c2.id))
 				let is_saved = user_saved_books.find((save) => save.book.id == book.id);
 
-				responseData.audioBooks.push({ id: book.id, picture_path: resolveURL(book.picture?.url), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
+				responseData.audioBooks.push({ id: book.id, category_id: category?.id, picture_path: resolveURL(book.picture?.url), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
 			}
 		});
+		book_categories.sort((a, b) => {
+			if (a.is_featured && b.is_featured) {
+				return a.name.localeCompare(b.name) > 0
+			}
+			if (a.is_featured) {
+				return 1;
+			}
+			if (b.is_featured) {
+				return -1;
+			}
+			return a.name.localeCompare(b.name)
+		})
 		book_categories.forEach((category) => {
 			let tempBooks = books
 				.filter((book) => {
