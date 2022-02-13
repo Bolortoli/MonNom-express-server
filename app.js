@@ -1535,6 +1535,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 				responseData.bestBooks.push({ id: book.id, picture_path: resolveURL(book.featured_picture?.url) });
 			}
 			if (book.has_audio) {
+				const imageUrl = book.picture?.formats.small?.url || book.picture?.formats.thumbnail?.url;
 				let tempAuthorsString = "";
 				book.book_authors.forEach((author, index) => {
 					if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
@@ -1544,7 +1545,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 				const category = book_categories.find((c) => book.book_categories.find((c2) => c.id === c2.id))
 				let is_saved = user_saved_books.find((save) => save.book.id == book.id);
 
-				responseData.audioBooks.push({ id: book.id, category_id: category?.id, picture_path: resolveURL(book.picture?.formats.small?.url), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
+				responseData.audioBooks.push({ id: book.id, category_id: category?.id, picture_path: resolveURL(imageUrl), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
 			}
 		});
 		book_categories.sort((a, b) => {
