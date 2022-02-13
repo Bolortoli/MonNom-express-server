@@ -130,6 +130,22 @@ async function getQpayClient(){
 	}
 }
 
+app.get("/app/update/:platform", async (req, res) => {
+	if (req.params.platform === 'android') {
+		res.send({
+			version: `1.0`,
+			build: 26,
+			required: true
+		})
+	} else {
+		res.send({
+			version: `1.0.6`,
+			build: 1,
+			required: true
+		})
+	}
+});
+
 // PUBLIC ENDPOINTS
 app.post("/admin-login", async (req, res) => {
 	console.log(req.body);
