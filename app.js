@@ -1966,7 +1966,7 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 
 		responseData.book = {
 			id: book.id,
-			picture: resolveURL(book.picture?.formats.small.url || book.picture?.formats.thumbnail.url),
+			picture: resolveURL(book.picture?.formats.small?.url || book.picture?.formats.thumbnail?.url),
 			name: book.name,
 			eBookPrice: book.online_book_price,
 			bookPrice: book.book_price,
