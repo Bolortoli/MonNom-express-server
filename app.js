@@ -1566,7 +1566,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 					return b.length != 0;
 				})
 				.map((book) => {
-					const bookImageUrl = books.picture?.formats.small?.url || books.picture?.formats.thumbnail?.url;
+					const bookImageUrl = book.picture?.formats.small?.url || book.picture?.formats.thumbnail?.url;
 					let tempAuthorsString = "";
 					book.book_authors.forEach((author, index) => {
 						if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
