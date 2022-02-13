@@ -2003,7 +2003,7 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 
 		related_books.forEach((book) => {
 			let isDuplicated = responseData.relatedBooks.filter((related_book) => related_book.id == book.id);
-			if (isDuplicated.length == 0) responseData.relatedBooks.push({ id: book.id, name: book.name, picture: resolveURL(book.picture?.formats.small.url) });
+			if (isDuplicated.length == 0) responseData.relatedBooks.push({ id: book.id, name: book.name, picture: resolveURL(book.picture?.formats.small?.url || book.picture?.formats.thumbnail?.url) });
 		});
 
 		send200({ responseData }, res);
