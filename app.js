@@ -1966,7 +1966,7 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 
 		responseData.book = {
 			id: book.id,
-			picture: resolveURL(book.picture?.url),
+			picture: resolveURL(book.picture?.formats.medium.url),
 			name: book.name,
 			eBookPrice: book.online_book_price,
 			bookPrice: book.book_price,
@@ -2003,7 +2003,7 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 
 		related_books.forEach((book) => {
 			let isDuplicated = responseData.relatedBooks.filter((related_book) => related_book.id == book.id);
-			if (isDuplicated.length == 0) responseData.relatedBooks.push({ id: book.id, name: book.name, picture: resolveURL(book.picture?.url) });
+			if (isDuplicated.length == 0) responseData.relatedBooks.push({ id: book.id, name: book.name, picture: resolveURL(book.picture?.formats.small.url) });
 		});
 
 		send200({ responseData }, res);
