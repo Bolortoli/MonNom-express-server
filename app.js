@@ -1530,7 +1530,6 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 		special_book = special_book?.data || null;
 		user_saved_books = user_saved_books?.data || [];
 		responseData.audioBookCategories = book_categories || [];
-
 		books.forEach((book) => {
 			if (book.is_featured) {
 				responseData.bestBooks.push({ id: book.id, picture_path: resolveURL(book.featured_picture?.url) });
@@ -1545,7 +1544,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 				const category = book_categories.find((c) => book.book_categories.find((c2) => c.id === c2.id))
 				let is_saved = user_saved_books.find((save) => save.book.id == book.id);
 
-				responseData.audioBooks.push({ id: book.id, category_id: category?.id, picture_path: resolveURL(book.picture?.url), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
+				responseData.audioBooks.push({ id: book.id, category_id: category?.id, picture_path: resolveURL(book.picture?.formats.small?.url.url), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
 			}
 		});
 		book_categories.sort((a, b) => {
@@ -1567,6 +1566,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 					return b.length != 0;
 				})
 				.map((book) => {
+					console.log(book.picture?.formats)
 					let tempAuthorsString = "";
 					book.book_authors.forEach((author, index) => {
 						if (index == book.book_authors.length - 1) tempAuthorsString += `${author.author_name}`;
@@ -1576,7 +1576,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 
 					return {
 						id: book.id,
-						picture_path: resolveURL(book.picture?.url),
+						picture_path: resolveURL(book.picture?.formats.small?.url),
 						authors: tempAuthorsString,
 						name: book.name,
 						is_saved: is_saved != undefined ? true : false,
@@ -1774,14 +1774,14 @@ app.get(`/app/my-library/:user_id?`, async (req, res) => {
 
 		podcast_channels.forEach((channel) => {
 			if (responseData.podcastChannels.filter((searchChannel) => searchChannel.id == channel.podcast_channel.id).length == 0) {
-				responseData.podcastChannels.push({ id: channel.podcast_channel?.id, name: channel.podcast_channel?.name, picture: resolveURL(channel.podcast_channel.cover_pic?.url) });
+				responseData.podcastChannels.push({ id: channel.podcast_channel?.id, name: channel.podcast_channel?.name, picture: resolveURL(channel.podcast_channel.cover_pic?.formats.small?.url) });
 			}
 		});
 
 		boughtEbooks.forEach((boughtBook) => {
 			if (responseData.books.filter((searchBook) => searchBook.id == boughtBook.book?.id).length == 0) {
 				if (boughtBook.book?.id){
-					responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
+					responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.formats.small?.url) });
 				}
 			}
 		});
@@ -1789,14 +1789,14 @@ app.get(`/app/my-library/:user_id?`, async (req, res) => {
 		boughtAudioBooks.forEach((boughtBook) => {
 			if (responseData.books.filter((searchBook) => searchBook.id == boughtBook.book?.id).length == 0) {
 				if (boughtBook.book?.id){
-					responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.url) });
+					responseData.books.push({ id: boughtBook.book?.id, name: boughtBook.book?.name, picture: resolveURL(boughtBook.book?.picture?.formats.small?.url) });
 				}
 			}
 		});
 
 		savedBooks.forEach((save) => {
 			if (responseData.saved.filter((searchBook) => searchBook.id == save.book?.id).length == 0) {
-				responseData.saved.push({ id: save.book?.id, name: save.book?.name, picture: resolveURL(save.book?.picture?.url) });
+				responseData.saved.push({ id: save.book?.id, name: save.book?.name, picture: resolveURL(save.book?.picture?.formats.small?.url) });
 			}
 		});
 
