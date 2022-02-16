@@ -539,7 +539,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 		let tempInvoiceId = create_temp_unique_text("xxxxxx-xxxxxx");
 
 		const config = {
-			Authorization: `Bearer ${req.headers.authorization}`
+			Authorization: `${req.headers.authorization}`
 		}
 
 		// Get QPAY access token
