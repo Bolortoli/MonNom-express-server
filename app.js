@@ -954,8 +954,6 @@ app.get("/podcast-channels/:id", async (req, res) => {
 		},
 	})
 		.then((response) => {
-			console.log("got fcken success");
-			console.log(response.data);
 			let sendData = {
 				id: response.data.id,
 				user_fullname: response.data.users_permissions_user?.fullname,
@@ -995,7 +993,6 @@ app.delete("/podcast/:id", async (req, res) => {
 			}
 		})
 		.then((response) => {
-			console.log(response.data);
 			res.status(202).send({ message: "success" });
 		})
 		.catch((err) => {
@@ -1156,7 +1153,6 @@ app.get("/all-admins-list", (req, res) => {
 	}
 	axios({ url: `${STRAPI_URL}/users?user_role=1&user_role=2&user_role=3&user_role=4&user_role=5`, method: "GET", headers })
 		.then((response) => {
-			console.log(response.data.map((d) => d.user_role));
 			send200(response.data, res);
 		})
 		.catch((err) => {
@@ -1218,7 +1214,6 @@ app.get("/podcast-channels", async (req, res) => {
 			let sendData = {
 				podcastChannels: response.data
 					.map((data, index) => {
-						console.log(data);
 						return {
 							id: data.id,
 							pagination_number: index + 1,
@@ -1285,7 +1280,6 @@ app.get("/all-books-list", async (req, res) => {
 
 		tempResponse.books = books
 			.map((book, index) => {
-				console.log(book);
 
 				if (book.users_permissions_user != null)
 					return {
@@ -1322,7 +1316,6 @@ app.get("/all-books-list", async (req, res) => {
 // Unsave podcast channel
 app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 	try {
-		console.log("unsave podcast channel");
 		let saves = [];
 		let saved_podcasts = await axios({
 			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.body.channel_id}&users_permissions_user=${req.body.user_id}`,
@@ -1339,7 +1332,6 @@ app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 			saves.push(`${STRAPI_URL}/user-saved-podcasts/${podcast.id}`);
 		});
 
-		console.log(saves);
 		const [resp] = await Promise.all(saves.map((podcastRequest) => axios.delete(podcastRequest, {})));
 		send200({}, res);
 	} catch (error) {
@@ -1366,7 +1358,6 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			saves.push(`${STRAPI_URL}/user-saved-books/${podcast.id}`);
 		});
 
-		console.log(saves);
 		const [resp] = await Promise.all(
 			saves.map((podcastRequest) =>
 				axios.delete(podcastRequest, {
@@ -1385,7 +1376,6 @@ app.post("/app/unsave-book", async (req, res, next) => {
 // all channels list
 app.get("/app/live", async (req, res, next) => {
 	// try {
-	console.log(req.headers);
 	let responseData = {
 		channelsList: [],
 	};
@@ -1404,7 +1394,6 @@ app.get("/app/live", async (req, res, next) => {
 	channel = channel.data;
 
 	channel.forEach((c) => {
-		console.log(c);
 		if (c.is_active && c.radio_channel_audios.length != 0)
 			responseData.channelsList.push({
 				id: c.id,
@@ -2037,7 +2026,6 @@ app.get(`/app/book/:book_id/:userId?`, async (req, res) => {
 
 app.get(`/app/search/book/audio/:search`, async (req, res) => {
 	console.log("book search app");
-	console.log(req.params.search);
 	try {
 		let responseData = {
 			books: [],
@@ -2115,7 +2103,6 @@ app.get(`/app/search/book/audio`, async (req, res) => {
 
 app.get(`/app/search/book/:search`, async (req, res) => {
 	console.log("book search app");
-	console.log(req.params.search);
 	try {
 		let responseData = { books: [] };
 
