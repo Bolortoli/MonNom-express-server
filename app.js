@@ -130,6 +130,16 @@ async function getQpayClient(){
 	}
 }
 
+// for version compatibility
+app.use((req, res, next) => {
+	if (req.headers.authorization) {
+		if (!req.headers.authorization?.toString().startsWith('Bearer')) {
+			req.headers.authorization = `Bearer ${req.headers.authorization}`
+		}
+	}
+	next();
+})
+
 app.get("/app/update/:platform", async (req, res) => {
 	if (req.params.platform === 'android') {
 		res.send({
@@ -503,12 +513,6 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 // PRIVATE ENDPOINTS
 
 // app version compatibility
-app.use((req, res, next) => {
-	if (!req.headers.authorization?.toString().startsWith('Bearer')) {
-		req.headers.authorization = `Bearer ${req.headers.authorization}`
-	}
-	next();
-})
 
 app.use(jwt({ secret: process.env.JWT_SECRET, algorithms: ['HS256'] }));
 
