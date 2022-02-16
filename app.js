@@ -132,7 +132,6 @@ async function getQpayClient(){
 
 // for version compatibility
 app.use((req, res, next) => {
-	console.log(req.headers.authorization)
 	if (req.headers.authorization) {
 		if (!req.headers.authorization?.toString().startsWith('Bearer')) {
 			req.headers.authorization = `Bearer ${req.headers.authorization}`
