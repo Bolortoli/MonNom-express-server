@@ -134,7 +134,7 @@ async function getQpayClient(){
 app.use((req, res, next) => {
 	if (req.headers.authorization) {
 		if (!req.headers.authorization?.toString().startsWith('Bearer')) {
-			req.headers.authorization = `${req.headers.authorization}`
+			req.headers.authorization = `Bearer ${req.headers.authorization}`
 		}
 	}
 	next();
@@ -160,7 +160,7 @@ app.get("/app/update/:platform", async (req, res) => {
 app.post("/admin-login", async (req, res) => {
 	console.log(req.body);
 	await axios
-		.post(`${STRAPI_URL}/auth/local`, { identifier: req.body.identifier, password: req.body.password }, { Authorization: `${req.headers.authorization}` })
+		.post(`${STRAPI_URL}/auth/local`, { identifier: req.body.identifier, password: req.body.password }, { Authorization: `Bearer ${req.headers.authorization}` })
 		.then((response) => {
 			send200(response.data, res);
 		})
@@ -1038,7 +1038,7 @@ app.post("/create-admin", upload.single("profile_picture"), async (req, res, nex
 	await axios({
 		url: `${STRAPI_URL}/users`,
 		method: "POST",
-		headers: { "content-type": "multipart/form-data", Authorization: `${req.headers.authorization}` },
+		headers: { "content-type": "multipart/form-data", Authorization: `Bearer ${req.headers.authorization}` },
 		body: { username: req.body.username, password: req.body.password, role: 1, phone: req.body.phone, gender: req.body.gender, fullname: req.body.fullname, user_role: req.body.user_role, e_mail: req.body.emailof, email: req.body.emailof },
 	})
 		.then((response) => {
@@ -1055,7 +1055,7 @@ app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, r
 		url: `${STRAPI_URL}/settings`,
 		method: "PUT",
 		headers: {
-			Authorization: `${req.headers.authorization}`,
+			Authorization: `Bearer ${req.headers.authorization}`,
 		},
 		data: {
 			TermsAndConditions: req.body.terms,
@@ -1190,7 +1190,7 @@ app.post("/update-employee", async (req, res) => {
 	delete body["id"];
 	await axios({
 		headers: {
-			Authorization: `${req.headers.authorization}`,
+			Authorization: `Bearer ${req.headers.authorization}`,
 		},
 		url: `${STRAPI_URL}/users/${id}`,
 		method: "PUT",
@@ -1209,7 +1209,7 @@ app.post("/update-employee", async (req, res) => {
 app.get("/podcast-channels", async (req, res) => {
 	await axios({
 		headers: {
-			Authorization: `${req.headers.authorization}`,
+			Authorization: `Bearer ${req.headers.authorization}`,
 		},
 		url: `${STRAPI_URL}/podcast-channels`,
 		method: "GET",
@@ -1252,7 +1252,7 @@ app.get("/all-app-users", async (req, res) => {
 		url: `${STRAPI_URL}/users?user_role=6&_limit=1000000000`,
 		method: "GET",
 		headers: {
-			Authorization: `${req.headers.authorization}`,
+			Authorization: `Bearer ${req.headers.authorization}`,
 		},
 	})
 		.then((response) => {
@@ -1371,7 +1371,7 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			saves.map((podcastRequest) =>
 				axios.delete(podcastRequest, {
 					headers: {
-						Authorization: `${req.headers.authorization}`,
+						Authorization: `Bearer ${req.headers.authorization}`,
 					},
 				})
 			)
@@ -1394,7 +1394,7 @@ app.get("/app/live", async (req, res, next) => {
 		url: `${STRAPI_URL}/radio-channels`,
 		method: "GET",
 		headers: {
-			Authorization: `${req.headers.authorization}`,
+			Authorization: `Bearer ${req.headers.authorization}`,
 		},
 	}).catch((err) => {
 		console.log(err);
