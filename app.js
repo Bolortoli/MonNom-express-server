@@ -132,6 +132,7 @@ async function getQpayClient(){
 
 // for version compatibility
 app.use((req, res, next) => {
+	console.log(req.headers.authorization)
 	if (req.headers.authorization) {
 		if (!req.headers.authorization?.toString().startsWith('Bearer')) {
 			req.headers.authorization = `Bearer ${req.headers.authorization}`
@@ -512,8 +513,6 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 
 // PRIVATE ENDPOINTS
 
-// app version compatibility
-
 app.use(jwt({ secret: process.env.JWT_SECRET, algorithms: ['HS256'] }));
 
 // ----------------------------- PAYEMNT APIs -----------------------------
@@ -651,7 +650,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 			method: "POST",
 			url: `${STRAPI_URL}/payments`,
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 			data: paymenCreatePayload,
 		}).catch(() => {
@@ -1081,7 +1080,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/settings`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1091,7 +1090,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/podcast-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1101,7 +1100,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error2";
@@ -1111,7 +1110,7 @@ app.get("/settings-page", async (req, res) => {
 			url: `${STRAPI_URL}/book-authors`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
@@ -1277,7 +1276,7 @@ app.get("/all-books-list", async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1330,7 +1329,7 @@ app.post("/app/unsave-podcast-channel", async (req, res, next) => {
 			url: `${STRAPI_URL}/user-saved-podcasts?podcast_channel.id=${req.body.channel_id}&users_permissions_user=${req.body.user_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1357,7 +1356,7 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.body.user_id}&book.id=${req.body.book_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1433,7 +1432,7 @@ app.get("/app/live/:channel_id", async (req, res, next) => {
 			url: `${STRAPI_URL}/radio-channels/${req.params.channel_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
@@ -1506,7 +1505,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			// console.log(err);
@@ -1517,7 +1516,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 			url: `${STRAPI_URL}/book-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
@@ -1527,7 +1526,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 			url: `${STRAPI_URL}/user-saved-books?users_permissions_user=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
@@ -1538,7 +1537,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 			url: `${STRAPI_URL}/special-book`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			console.log(err);
@@ -1639,7 +1638,7 @@ app.get(`/app/podcasts/main/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-channels`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1649,7 +1648,7 @@ app.get(`/app/podcasts/main/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-categories`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error2";
@@ -1659,7 +1658,7 @@ app.get(`/app/podcasts/main/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
@@ -1669,7 +1668,7 @@ app.get(`/app/podcasts/main/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-episodes?_sort=created_at:DESC`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error3";
@@ -1752,7 +1751,7 @@ app.get(`/app/my-library/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/user-saved-podcasts?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1762,7 +1761,7 @@ app.get(`/app/my-library/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/customer-paid-ebooks?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1772,7 +1771,7 @@ app.get(`/app/my-library/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/customer-paid-audio-books?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1782,7 +1781,7 @@ app.get(`/app/my-library/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/user-saved-books?users_permissions_user.id=${req.user.id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -1836,7 +1835,7 @@ app.get(`/app/audio-books/:book_id/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/book-audios?book.id=${req.params.book_id}&_sort=number:ASC`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error";
@@ -1874,7 +1873,7 @@ app.get(`/app/podcast-channel/:channel_id/:user_id?`, async (req, res) => {
 			url: `${STRAPI_URL}/podcast-channels/${req.params.channel_id}`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "Failed to fetch podcast channel";
@@ -2049,7 +2048,7 @@ app.get(`/app/search/book/audio/:search`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
@@ -2090,7 +2089,7 @@ app.get(`/app/search/book/audio`, async (req, res) => {
 			url: `${STRAPI_URL}/books`,
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`,
+				Authorization: `${req.headers.authorization}`,
 			},
 		}).catch((err) => {
 			throw "error1";
