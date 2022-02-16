@@ -572,7 +572,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 					is_delivered: false,
 				},
 				headers: {
-					Authorization: `Bearer ${req.headers.authorization}`
+					Authorization: `${req.headers.authorization}`
 				}
 			});
 			delivery = deliveryCreateResponse.data;
@@ -668,7 +668,7 @@ app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
 				qpay_invoice_id: qpayInvoiceId
 			},
 			headers: {
-				Authorization: `Bearer ${req.headers.authorization}`
+				Authorization: `${req.headers.authorization}`
 			}
 		})
 
