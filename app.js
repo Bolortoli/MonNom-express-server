@@ -1055,7 +1055,7 @@ app.put("/terms-and-conditions", upload.single("profile_picture"), async (req, r
 		url: `${STRAPI_URL}/settings`,
 		method: "PUT",
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 		data: {
 			TermsAndConditions: req.body.terms,
@@ -1209,7 +1209,7 @@ app.post("/update-employee", async (req, res) => {
 app.get("/podcast-channels", async (req, res) => {
 	await axios({
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 		url: `${STRAPI_URL}/podcast-channels`,
 		method: "GET",
@@ -1371,7 +1371,7 @@ app.post("/app/unsave-book", async (req, res, next) => {
 			saves.map((podcastRequest) =>
 				axios.delete(podcastRequest, {
 					headers: {
-						Authorization: `Bearer ${req.headers.authorization}`,
+						Authorization: `${req.headers.authorization}`,
 					},
 				})
 			)
@@ -1394,7 +1394,7 @@ app.get("/app/live", async (req, res, next) => {
 		url: `${STRAPI_URL}/radio-channels`,
 		method: "GET",
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 	}).catch((err) => {
 		console.log(err);
