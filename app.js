@@ -1186,7 +1186,7 @@ app.post("/update-employee", async (req, res) => {
 	delete body["id"];
 	await axios({
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 		url: `${STRAPI_URL}/users/${id}`,
 		method: "PUT",
@@ -1247,7 +1247,7 @@ app.get("/all-app-users", async (req, res) => {
 		url: `${STRAPI_URL}/users?user_role=6&_limit=1000000000`,
 		method: "GET",
 		headers: {
-			Authorization: `Bearer ${req.headers.authorization}`,
+			Authorization: `${req.headers.authorization}`,
 		},
 	})
 		.then((response) => {
