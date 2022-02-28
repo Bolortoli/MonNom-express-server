@@ -514,6 +514,42 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 
 app.use(jwt({ secret: process.env.JWT_SECRET, algorithms: ['HS256'] }));
 
+app.post("/admin/notification", async (req, res) => {
+	const {title, body} = req.body;
+	const count = (await axios.get(`${STRAPI_URL}/users/count?user_role=6`)).data;
+	const page = 100;
+	let done = false;
+	let offset = 0;
+	while (!done) {
+		const users = (await axios.get(`${STRAPI_URL}/users?user_role=6&_start=${offset}&_limit=${page}`)).data;
+		const tokens = (users || []).map(u => u.fcm_token).filter(t => t);
+		if (!tokens?.length) {
+			done = true;
+			break;
+		}
+		const data = {
+            "registration_ids": tokens,
+            notification: {
+                "title": title,
+                "body": body,
+            }
+        };
+		await axios({
+            url: 'https://fcm.googleapis.com/fcm/send',
+            method: 'POST',
+            headers: {
+                Authorization: `key=AAAA6YS5v-A:APA91bEXNmz80Kywb3Yeh48n1U9O47GUSt81AoCKYWp5CLGbiQBfIasJ_P2Yu7zVUGDKcInuLvVPtzXhD_fPWQd494-UK5yFl-usQHIRyKoBTphNCY8qEQk0v0QqiMayjVWnohzA7MNy`,
+            },
+            data: data
+        });
+		offset += page;
+	}
+	res.send({
+		message: 'Success',
+		count: count
+	})
+});
+
 // ----------------------------- PAYEMNT APIs -----------------------------
 
 app.post("/payment/create-invoice/:payment_type", async (req, res, next) => {
