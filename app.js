@@ -10,13 +10,16 @@ import faker from 'faker';
 import moment from 'moment';
 import randToken from 'rand-token';
 import randomatic from 'randomatic';
-import jwt from 'express-jwt';
+import expressJwt from 'express-jwt';
+import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import compression from 'compression';
+import nodemailer from 'nodemailer';
 import legacyPublicRoutes from './routes/legacyPublicRoutes.js';
 import legacyPrivateRoutes from './routes/legacyPrivateRoutes.js';
 
 
+const JWT_SECRET = process.env.JWT_SECRET;
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -41,7 +44,15 @@ const PAYMENT_EBOOK_MAGIC_WORD = "ebook";
 const PAYMENT_AUDIO_BOOK_MAGIC_WORD = "audio-book";
 const PAYMENT_BOOK_MAGIC_WORD = "book";
 
-const PASSWORD_RESET_VALID_MINUTES = 1;
+const PASSWORD_RESET_VALID_MINUTES = 5;
+
+const mailTransporter = nodemailer.createTransport({
+	service: 'gmail',
+	auth: {
+		user: process.env.MAIL_USERNAME,
+		pass: process.env.MAIL_PASSWORD
+	}
+});
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -157,6 +168,139 @@ app.get("/app/update/:platform", async (req, res) => {
 });
 
 // PUBLIC ENDPOINTS
+app.post('/app/fb-login', async (req, res) => {
+
+	const {userId, accessToken} = req.body;
+	const resp = await axios.get(`https://graph.facebook.com/v13.0/${userId}?fields=email%2Cname%2Cfirst_name%2Clast_name%2Clocation%2Cbirthday%2Clink%2Cgender&access_token=${accessToken}`)
+	const fbData = resp.data;
+	const [emailUserResp, fbUserIdResp] = await Promise.all([
+		axios.get(`${STRAPI_URL}/users?email=${fbData.email}&_limit=1`),
+		axios.get(`${STRAPI_URL}/users?facebookUserId=${userId}&_limit=1`)
+	])
+
+	const password = `Pwd$-${userId}`
+
+	const userDetail = {
+		username: fbData.email,
+		phone: null,
+		password: password,
+		email: fbData.email,
+		gender: null,
+		birthday: null,
+		fullname: fbData.name,
+		user_role: 6,
+		facebookAccessToken: accessToken,
+		facebookUserId: userId
+	}
+
+	if (emailUserResp.data?.length || fbUserIdResp.data?.length) {
+		const existingUser = fbUserIdResp.data?.length ? fbUserIdResp.data[0] : emailUserResp.data[0]
+		const duration = 3 * 24 * 60 * 60;
+		const userJwt = jwt.sign({
+			id: existingUser.id,
+		}, JWT_SECRET, {
+			expiresIn: `${duration}s`
+		})
+		return res.send({
+			"jwt": userJwt,
+			"user": existingUser
+		})
+	} else {
+		// create user
+		try {
+			const r = await axios({
+				url: `${STRAPI_URL}/users`,
+				method: "POST",
+				data: userDetail,
+			})
+		} catch(e) {
+			console.log(e)
+			res.status(400).send({
+				message: 'Server Error'
+			})
+		}
+	}
+	// login after create user
+	axios.post(`${STRAPI_URL}/auth/local`, {
+		identifier: userDetail.email,
+		password: password
+	})
+	.then((response) => {
+		send200(response.data, res);
+	})
+	.catch((err) => {
+		console.log("2nd");
+		console.log(err)
+		throw "error";
+	});
+})
+
+app.post('/app/google-login', async (req, res) => {
+	const {
+		idToken,
+		scopes,
+		openid,
+		serverAuthCode,
+		user
+	} = req.body;
+	const {
+		familyName,
+		givenName,
+		id,
+		name,
+		photo,
+		email
+	} = user;
+	const existingResp = await axios.get(`${STRAPI_URL}/users?email=${email}&_limit=1`);
+	if (existingResp.data?.length) {
+		const existingUser = existingResp.data[0]
+		const duration = 3 * 24 * 60 * 60;
+		const userJwt = jwt.sign({
+			id: existingUser.id,
+		}, JWT_SECRET, {
+			expiresIn: `${duration}s`
+		})
+		return res.send({
+			"jwt": userJwt,
+			"user": existingUser
+		})
+	} else {
+		// create new user
+		const password = `Pwd-${id}`
+		const userDetail = {
+			username: email,
+			phone: null,
+			password: password,
+			email: email,
+			gender: null,
+			birthday: null,
+			fullname: name,
+			user_role: 6,
+			googleIdToken: idToken,
+			googleUserId: id
+		}
+		// create user
+		try {
+			const r = await axios({
+				url: `${STRAPI_URL}/users`,
+				method: "POST",
+				data: userDetail,
+			})
+			// login after create user
+			const loginResponse = await axios.post(`${STRAPI_URL}/auth/local`, {
+				identifier: userDetail.email,
+				password: password
+			})
+			return res.send(loginResponse.data);
+		} catch(e) {
+			console.log(e)
+			res.status(400).send({
+				message: 'Service Unavailable'
+			})
+		}
+	}
+})
+
 app.post("/admin-login", async (req, res) => {
 	console.log(req.body);
 	await axios
@@ -391,13 +535,14 @@ app.post('/user/forgot-password', async (req, res) => {
 	const tempUser = await createTempUser();
 	try {
 		const { username } = req.body;
+		console.log(username)
 		const apiClient = axios.create({
 			baseURL: STRAPI_URL,
 			headers: {
 				Authorization: `Bearer ${tempUser.user.jwt}`
 			}
 		});
-		const userToResetPwdResponse = await apiClient.get(`/users?username=${username}&_limit=1`);
+		const userToResetPwdResponse = await apiClient.get(`/users?_where[_or][0][username]=${username}&_where[_or][1][email]=${username}&_where[_or][1][phone]=${username}`);
 		if (!userToResetPwdResponse.data.length) {
 			throw 'no user found'
 		} else {
@@ -409,19 +554,40 @@ app.post('/user/forgot-password', async (req, res) => {
 				resetPasswordToken: null,
 				resetPasswordTokenIssuedAt: codeSentAt
 			});
-			await axios({
-				url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom: tanii neg udaagiin nuuts kod: ${resetPasswordCode}`,
-				method: "GET",
-			})
-			send200({
-				codeSentAt,
-				minutes: PASSWORD_RESET_VALID_MINUTES,
-				// resetPasswordCode
-			}, res);
+			if (user.phone) {
+				console.log(`send message`)
+				await axios({
+					url: `http://web2sms.skytel.mn/apiSend?token=${SKYTEL_TOKEN}&sendto=${user.phone}&message=Monnom: tanii neg udaagiin nuuts kod: ${resetPasswordCode}`,
+					method: "GET",
+				})
+				send200({
+					codeSentAt,
+					minutes: PASSWORD_RESET_VALID_MINUTES,
+					// resetPasswordCode
+				}, res);
+			} else if (user.email) {
+				const resp = await mailTransporter.sendMail({
+					from: `Monnom`,
+					to: user.email,
+					subject: `Monnom нууц үг сэргээх`,
+					text: `Monnom нууц үг сэргээх код: ${resetPasswordCode}`
+				})
+				send200({
+					codeSentAt,
+					minutes: PASSWORD_RESET_VALID_MINUTES,
+					// resetPasswordCode
+				}, res);
+			} else {
+				res.status(400).send({
+					message: `Утас/Имейл бүртгэгдээгүй байна`
+				})
+			}
 		}
 	} catch (e) {
 		console.log(e);
-		send400(e, res)
+		res.status(400).send({
+			message: `Service Unavailable`
+		})
 	}
 	await tempUser.delete();
 });
@@ -448,8 +614,10 @@ app.post('/user/forgot-password/confirm', async (req, res) => {
 		const user = usersResponse.data[0];
 		// хугацаа шалгах
 		const now = moment.utc();
-		const due = moment(user.resetPasswordTokenIssuedAt);
-		const delta = moment.duration(now.diff(due));
+		const due = moment(user.resetPasswordTokenIssuedAt).add(PASSWORD_RESET_VALID_MINUTES, 'minutes');
+		console.log(now.format('YYYY-MM-DD HH:mm:ss'))
+		console.log(due.format('YYYY-MM-DD HH:mm:ss'))
+		const delta = moment.duration(due.diff(now));
 		if (delta.asMinutes() > PASSWORD_RESET_VALID_MINUTES) {
 			throw 'Кодын хүчинтэй хугацаа дууссан байна';
 		}
@@ -512,7 +680,7 @@ app.post('/user/forgot-password/reset', async (req, res) => {
 
 // PRIVATE ENDPOINTS
 
-app.use(jwt({ secret: process.env.JWT_SECRET, algorithms: ['HS256'] }));
+app.use(expressJwt({ secret: JWT_SECRET, algorithms: ['HS256'] }));
 
 app.post("/admin/notification", async (req, res) => {
 	const {title, body} = req.body;
@@ -1348,6 +1516,18 @@ app.get("/all-books-list", async (req, res) => {
 // app.post('/app/guest/login', async (req, res) => {
 
 // });
+
+app.post(`/app/user/update`, async (req, res) => {
+	const {
+		username
+	} = req.body;
+	if (!`${username}`.match(/[d+]/)) {
+		return res.status(400).send({
+			message: `Утасны дугаараа зөв оруулна уу`
+		})
+	}
+
+})
 
 // Unsave podcast channel
 app.post("/app/unsave-podcast-channel", async (req, res, next) => {
