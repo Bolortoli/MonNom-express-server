@@ -155,13 +155,13 @@ app.get("/app/update/:platform", async (req, res) => {
 	if (req.params.platform === 'android') {
 		res.send({
 			version: `1.0`,
-			build: 33,
+			build: 34,
 			required: true
 		})
 	} else {
 		res.send({
-			version: `1.0.6`,
-			build: 1,
+			version: `1.0.8`,
+			build: 2,
 			required: true
 		})
 	}
