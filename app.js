@@ -1355,7 +1355,7 @@ app.get("/all-admins-list", (req, res) => {
 	const headers = {
 		Authorization: req.headers.authorization
 	}
-	axios({ url: `${STRAPI_URL}/users?user_role=1&user_role=2&user_role=3&user_role=4&user_role=5`, method: "GET", headers })
+	axios({ url: `${STRAPI_URL}/users?user_role=1&user_role=2&user_role=3&user_role=4&user_role=5&_limit=1000000000`, method: "GET", headers })
 		.then((response) => {
 			send200(response.data, res);
 		})
