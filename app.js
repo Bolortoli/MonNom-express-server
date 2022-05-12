@@ -23,8 +23,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const app = express();
 const port = process.env.PORT || 3000;
 
-const STRAPI_URL = "https://strapi.monnom.mn";
-const EXPRESS_URL = 'https://express.monnom.mn';
+const STRAPI_URL = "http://strapi.monnom.mn";
+const EXPRESS_URL = 'http://express.monnom.mn';
 // const STRAPI_URL = "http://localhost:1337";
 // const EXPRESS_URL = 'http://localhost:3000';
 
