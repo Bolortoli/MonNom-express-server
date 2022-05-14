@@ -1,5 +1,7 @@
 dotenv.config();
 
+import crypto from 'crypto';
+import appleSigninAuth from 'apple-signin-auth';
 import express from "express";
 import axios from "axios";
 import bodyParser from "body-parser";
@@ -18,18 +20,25 @@ import nodemailer from 'nodemailer';
 import legacyPublicRoutes from './routes/legacyPublicRoutes.js';
 import legacyPrivateRoutes from './routes/legacyPrivateRoutes.js';
 
+import {OAuth2Client as GoogleOAuth2Client} from 'google-auth-library';
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const app = express();
 const port = process.env.PORT || 3000;
 
-const STRAPI_URL = "http://strapi.monnom.mn";
+// const STRAPI_URL = "http://strapi.monnom.mn";
 const EXPRESS_URL = 'http://express.monnom.mn';
-// const STRAPI_URL = "http://localhost:1337";
+const STRAPI_URL = "http://localhost:1337";
 // const EXPRESS_URL = 'http://localhost:3000';
 
 // For OTP
 const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
+
+// google
+const GOOGLE_CLIENT_ID = '1002954145760-d27dnf6f0o0f26jme1b4oppud8vutrta.apps.googleusercontent.com';
+const GOOGLE_CLIENT_IDS = [GOOGLE_CLIENT_ID, '1002954145760-fg39sk13ib8a6261e67108v8p7usk65c.apps.googleusercontent.com']
+const googleOAuth2Client = new GoogleOAuth2Client(GOOGLE_CLIENT_ID);
 
 // For payment
 const QPAY_MERCHANT_USERNAME = "HAN_AQUA";
@@ -241,16 +250,32 @@ app.post('/app/google-login', async (req, res) => {
 		scopes,
 		openid,
 		serverAuthCode,
-		user
+		user,
 	} = req.body;
 	const {
 		familyName,
 		givenName,
 		id,
-		name,
+		name: nameRaw,
 		photo,
-		email
+		email: emailRaw,
 	} = user;
+	let name, email;
+	try {
+		const ticket = await googleOAuth2Client.verifyIdToken({
+			idToken: idToken,
+			audience: GOOGLE_CLIENT_IDS,  // Specify the CLIENT_ID of the app that accesses the backend
+			// Or, if multiple clients access the backend:
+			//[CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]
+		});
+		name = ticket.payload.name;
+		email = ticket.payload.email;
+	} catch(e) {
+		console.log(e)
+		return res.status(400).send({
+			message: `Invalid Signature`
+		})
+	}
 	const existingResp = await axios.get(`${STRAPI_URL}/users?email=${email}&_limit=1`);
 	if (existingResp.data?.length) {
 		const existingUser = existingResp.data[0]
@@ -299,6 +324,89 @@ app.post('/app/google-login', async (req, res) => {
 			})
 		}
 	}
+})
+
+app.post('/app/apple-login', async (req, res) => {
+	const {
+		authorizationCode,
+		authorizedScopes,
+		email: rawEmail,
+		fullName: {
+			familyName,
+			givenName,
+		},
+		identityToken,
+		nonce,
+		realUserStatus,
+		user
+	} = req.body;
+	let email = rawEmail;
+	try {
+		const appleIdTokenClaims = await appleSigninAuth.verifyIdToken(identityToken, {
+			/** sha256 hex hash of raw nonce */
+			nonce: nonce ? crypto.createHash('sha256').update(nonce).digest('hex') : undefined,
+		  });
+		email = appleIdTokenClaims.email;
+	} catch(e) {
+		return res.status(400).send({
+			message: 'Invalid Nonce'
+		})
+	}
+
+	const id = nonce;
+	
+	const existingResp = await axios.get(`${STRAPI_URL}/users?email=${email}&_limit=1`);
+	if (existingResp.data?.length) {
+		const existingUser = existingResp.data[0]
+		const duration = 3 * 24 * 60 * 60;
+		const userJwt = jwt.sign({
+			id: existingUser.id,
+		}, JWT_SECRET, {
+			expiresIn: `${duration}s`
+		})
+		return res.send({
+			"jwt": userJwt,
+			"user": existingUser
+		})
+	} else {
+		// create new user
+		const basicName = '';
+		if (!givenName?.length) {
+			basicName = email.substring(0, email.indexOf('@'))
+		}
+		const fullName = `${givenName || basicName} ${familyName || ''}`
+		const password = `Pwd-${id}`
+		const userDetail = {
+			username: email,
+			phone: null,
+			password: password,
+			email: email,
+			gender: null,
+			birthday: null,
+			fullname: fullName,
+			user_role: 6,
+		}
+		// create user
+		try {
+			const r = await axios({
+				url: `${STRAPI_URL}/users`,
+				method: "POST",
+				data: userDetail,
+			})
+			// login after create user
+			const loginResponse = await axios.post(`${STRAPI_URL}/auth/local`, {
+				identifier: userDetail.email,
+				password: password
+			})
+			return res.send(loginResponse.data);
+		} catch(e) {
+			console.log(e)
+			res.status(400).send({
+				message: 'Service Unavailable'
+			})
+		}
+	}
+
 })
 
 app.post("/admin-login", async (req, res) => {
