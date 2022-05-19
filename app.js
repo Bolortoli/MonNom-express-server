@@ -261,6 +261,7 @@ app.post('/app/google-login', async (req, res) => {
 		email: emailRaw,
 	} = user;
 	let name, email;
+	console.log(idToken)
 	try {
 		const ticket = await googleOAuth2Client.verifyIdToken({
 			idToken: idToken,
