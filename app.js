@@ -1894,7 +1894,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 		book_categories.forEach((category) => {
 			let tempBooks = books
 				.filter((book) => {
-					let b = book.book_categories.filter((book_category) => category.id == book_category.id);
+					let b = book.book_categories.filter((book_category) => (book.pdf_book_path || book.epub_book_path) && category.id == book_category.id);
 					return b.length != 0;
 				})
 				.map((book) => {
