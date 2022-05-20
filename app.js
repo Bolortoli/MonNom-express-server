@@ -260,23 +260,24 @@ app.post('/app/google-login', async (req, res) => {
 		photo,
 		email: emailRaw,
 	} = user;
-	let name, email;
+	let name = nameRaw;
+	let email = emailRaw
 	console.log(req.body)
-	try {
-		const ticket = await googleOAuth2Client.verifyIdToken({
-			idToken: idToken,
-			audience: GOOGLE_CLIENT_IDS,  // Specify the CLIENT_ID of the app that accesses the backend
-			// Or, if multiple clients access the backend:
-			//[CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]
-		});
-		name = ticket.payload.name;
-		email = ticket.payload.email;
-	} catch(e) {
-		console.log(e)
-		return res.status(400).send({
-			message: `Invalid Signature`
-		})
-	}
+	// try {
+	// 	const ticket = await googleOAuth2Client.verifyIdToken({
+	// 		idToken: idToken,
+	// 		audience: GOOGLE_CLIENT_IDS,  // Specify the CLIENT_ID of the app that accesses the backend
+	// 		// Or, if multiple clients access the backend:
+	// 		//[CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]
+	// 	});
+	// 	name = ticket.payload.name;
+	// 	email = ticket.payload.email;
+	// } catch(e) {
+	// 	console.log(e)
+	// 	return res.status(400).send({
+	// 		message: `Invalid Signature`
+	// 	})
+	// }
 	const existingResp = await axios.get(`${STRAPI_URL}/users?email=${email}&_limit=1`);
 	if (existingResp.data?.length) {
 		const existingUser = existingResp.data[0]
