@@ -1878,7 +1878,7 @@ app.get("/app/books/main/:user_id?", async (req, res) => {
 				const category = book_categories.find((c) => book.book_categories.find((c2) => c.id === c2.id))
 				let is_saved = user_saved_books.find((save) => save.book.id == book.id);
 
-				responseData.audioBooks.push({ id: book.id, category_id: category?.id, picture_path: resolveURL(imageUrl), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
+				responseData.audioBooks.push({ id: book.id, category_id: category?.id, categories: book.book_categories, picture_path: resolveURL(imageUrl), authors: tempAuthorsString, name: book.name, is_saved: is_saved != undefined ? true : false });
 			}
 		});
 		book_categories.sort((a, b) => {
