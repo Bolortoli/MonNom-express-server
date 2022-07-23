@@ -27,26 +27,24 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const app = express();
 const port = process.env.PORT || 3000;
 
-const STRAPI_URL = "http://strapi.monnom.mn";
-const EXPRESS_URL = 'http://express.monnom.mn';
-// const STRAPI_URL = "http://localhost:1337";
-// const EXPRESS_URL = 'http://localhost:3000';
+const STRAPI_URL = process.env.STRAPI_URL;
+const EXPRESS_URL = process.env.EXPRESS_URL;
 
 // For OTP
-const SKYTEL_TOKEN = "443d503255559117690576e36f84ffe896f3f693";
+const SKYTEL_TOKEN = process.env.SKYTEL_TOKEN;
 
 // google
-const GOOGLE_CLIENT_ID = '1002954145760-d27dnf6f0o0f26jme1b4oppud8vutrta.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_IDS = [GOOGLE_CLIENT_ID, '1002954145760-fg39sk13ib8a6261e67108v8p7usk65c.apps.googleusercontent.com']
 const googleOAuth2Client = new GoogleOAuth2Client(GOOGLE_CLIENT_ID);
 
 // For payment
-const QPAY_MERCHANT_USERNAME = "HAN_AQUA";
-const QPAY_MERCHANT_PASSWORD = "UOaod0R9";
-const QPAY_MERCHANT_INVOICE_NAME = "HANAQUA_INVOICE";
-const QPAY_BASE_URL = "https://merchant.qpay.mn/v2";
-const QPAY_MERCHANT = "https://merchant.qpay.mn/v2/invoice";
-const QPAY_MERCHANT_AUTHENTICATION = "https://merchant.qpay.mn/v2/auth/token";
+const QPAY_MERCHANT_USERNAME = process.env.QPAY_MERCHANT_USERNAME;
+const QPAY_MERCHANT_PASSWORD = process.env.QPAY_MERCHANT_PASSWORD;
+const QPAY_MERCHANT_INVOICE_NAME = process.env.QPAY_MERCHANT_INVOICE_NAME;
+const QPAY_BASE_URL = process.env.QPAY_BASE_URL;
+const QPAY_MERCHANT = process.env.QPAY_MERCHANT;
+const QPAY_MERCHANT_AUTHENTICATION = process.env.QPAY_MERCHANT_AUTHENTICATION;
 
 // Book payment types
 const PAYMENT_EBOOK_MAGIC_WORD = "ebook";
@@ -262,22 +260,21 @@ app.post('/app/google-login', async (req, res) => {
 	} = user;
 	let name = nameRaw;
 	let email = emailRaw
-	console.log(req.body)
-	// try {
-	// 	const ticket = await googleOAuth2Client.verifyIdToken({
-	// 		idToken: idToken,
-	// 		audience: GOOGLE_CLIENT_IDS,  // Specify the CLIENT_ID of the app that accesses the backend
-	// 		// Or, if multiple clients access the backend:
-	// 		//[CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]
-	// 	});
-	// 	name = ticket.payload.name;
-	// 	email = ticket.payload.email;
-	// } catch(e) {
-	// 	console.log(e)
-	// 	return res.status(400).send({
-	// 		message: `Invalid Signature`
-	// 	})
-	// }
+	try {
+		const ticket = await googleOAuth2Client.verifyIdToken({
+			idToken: idToken,
+			audience: GOOGLE_CLIENT_IDS,  // Specify the CLIENT_ID of the app that accesses the backend
+			// Or, if multiple clients access the backend:
+			//[CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]
+		});
+		name = ticket.payload.name;
+		email = ticket.payload.email;
+	} catch(e) {
+		console.log(e)
+		return res.status(400).send({
+			message: `Invalid Signature`
+		})
+	}
 	const existingResp = await axios.get(`${STRAPI_URL}/users?email=${email}&_limit=1`);
 	if (existingResp.data?.length) {
 		const existingUser = existingResp.data[0]
